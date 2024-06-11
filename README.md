@@ -1,3 +1,8 @@
+[![build](https://github.com/linkdata/webserv/actions/workflows/go.yml/badge.svg)](https://github.com/linkdata/webserv/actions/workflows/go.yml)
+[![coverage](https://coveralls.io/repos/github/linkdata/webserv/badge.svg?branch=main)](https://coveralls.io/github/linkdata/webserv?branch=main)
+[![goreport](https://goreportcard.com/badge/github.com/linkdata/webserv)](https://goreportcard.com/report/github.com/linkdata/webserv)
+[![Docs](https://godoc.org/github.com/linkdata/webserv?status.svg)](https://godoc.org/github.com/linkdata/webserv)
+
 # webserv
 
 Thin web server stub.

@@ -38,7 +38,11 @@ func NewListener(wantAddress, certDir string) (l Listener, err error) {
 	if cert, l.CertDir, err = LoadCert(certDir); err == nil {
 		if cert != nil {
 			l.Listener, err = tls.Listen("tcp", defaultAddress(wantAddress, ":443", ":8443"),
-				&tls.Config{Certificates: []tls.Certificate{*cert}})
+				&tls.Config{
+					Certificates: []tls.Certificate{*cert},
+					MinVersion:   tls.VersionTLS12,
+				},
+			)
 		} else {
 			l.Listener, err = net.Listen("tcp", defaultAddress(wantAddress, ":80", ":8080"))
 		}
