@@ -9,6 +9,9 @@ import (
 
 var ErrBecomeUserNotImplemented = errors.New("user switching not implemented for " + runtime.GOOS)
 
-func BecomeUser(userName string) error {
-	return ErrBecomeUserNotImplemented
+func BecomeUser(userName string) (err error) {
+	if userName != "" {
+		err = ErrBecomeUserNotImplemented
+	}
+	return
 }
