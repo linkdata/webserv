@@ -58,16 +58,19 @@ func TestNew(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				gotWl, _, gotUrl, err := webserv.Listener(tt.args.wantAddress, tt.args.certDir)
+				gotListener, gotUrl, gotCertDir, err := webserv.Listener(tt.args.wantAddress, tt.args.certDir)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
-				if gotWl != nil {
+				if gotListener != nil {
 					if gotUrl != tt.name {
 						t.Errorf("ListenURL() = %v, want %v", gotUrl, tt.name)
 					}
-					if err := gotWl.Close(); err != nil {
+					if gotCertDir != tt.args.certDir {
+						t.Error(gotCertDir)
+					}
+					if err := gotListener.Close(); err != nil {
 						t.Error(err)
 					}
 				}
