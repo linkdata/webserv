@@ -20,7 +20,7 @@ func DefaultDataDir(dataDir, defaultsuffix string) (string, error) {
 }
 
 // UseDataDir expands environment variables in dataDir,
-// transforms it into an absoulte path, creates it
+// transforms it into an absolute path, creates it
 // if it does not exist and finally changes current directory
 // to that path.
 //
