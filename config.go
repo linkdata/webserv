@@ -35,7 +35,7 @@ func logInfoQuoted(logger any, msg, val string) {
 // If DataDir or DefaultDataDirSuffix is set, creates that directory if needed
 // and sets the current working directory to it.
 //
-// On a non-error return, CertDir and DataDir will be absoulte paths or empty, and
+// On a non-error return, CertDir and DataDir will be absolute paths or empty, and
 // ListenURL will be a printable and connectable URL like "http://localhost:80".
 func (cfg *Config) Apply(logger any) (l net.Listener, err error) {
 	if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Listen, cfg.CertDir); err == nil {
