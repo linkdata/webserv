@@ -14,3 +14,45 @@ Given a listen address, certificate directory, user name and data directory:
 * Starts listening on the address and port.
 * If user name is given, switch to that user.
 * If data directory is given, create it if needed and then switch current directory to it.
+
+
+## Usage
+
+`go get github.com/linkdata/webserv`
+
+```go
+package main
+
+import (
+	"flag"
+	"log"
+
+	"github.com/linkdata/webserv"
+)
+
+var (
+	flagListen  = flag.String("listen", "", "serve HTTP requests on given [address][:port]")
+	flagCertDir = flag.String("certdir", "", "where to find fullchain.pem and privkey.pem")
+	flagUser    = flag.String("user", "www-data", "switch to this user after startup (*nix only)")
+	flagDataDir = flag.String("datadir", "$HOME", "where to store data files after startup")
+)
+
+func main() {
+	flag.Parse()
+
+	cfg := webserv.Config{
+		Listen:  *flagListen,
+		CertDir: *flagCertDir,
+		User:    *flagUser,
+		DataDir: *flagDataDir,
+	}
+
+	if l, err := cfg.Apply(log.Default()); err == nil {
+		defer l.Close()
+		log.Printf("listening on %q", cfg.ListenURL)
+	} else {
+		log.Fatal(err)
+	}
+}
+
+```
