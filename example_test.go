@@ -46,13 +46,15 @@ EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
 }
 
 func ExampleConfig_Apply() {
-	var cfg webserv.Config
+	cfg := webserv.Config{
+		Listen: "127.0.0.1:8080", // leave empty for all addresses and default port
+	}
 	if l, err := cfg.Apply(os.Stdout); err == nil {
 		defer l.Close()
-		fmt.Print("OK")
+		fmt.Print(cfg.ListenURL)
 	} else {
 		fmt.Print(err)
 	}
 	// Output:
-	// OK
+	// http://localhost:8080
 }
