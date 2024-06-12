@@ -1,60 +1,34 @@
 package webserv_test
 
 import (
-	"fmt"
-	"os"
-	"path"
-	"testing"
+	"flag"
+	"log"
 
 	"github.com/linkdata/webserv"
 )
 
-func withCertFiles(t *testing.T, fn func(destdir string)) {
-	t.Helper()
-	certPem := []byte(`-----BEGIN CERTIFICATE-----
-MIIBhTCCASugAwIBAgIQIRi6zePL6mKjOipn+dNuaTAKBggqhkjOPQQDAjASMRAw
-DgYDVQQKEwdBY21lIENvMB4XDTE3MTAyMDE5NDMwNloXDTE4MTAyMDE5NDMwNlow
-EjEQMA4GA1UEChMHQWNtZSBDbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABD0d
-7VNhbWvZLWPuj/RtHFjvtJBEwOkhbN/BnnE8rnZR8+sbwnc/KhCk3FhnpHZnQz7B
-5aETbbIgmuvewdjvSBSjYzBhMA4GA1UdDwEB/wQEAwICpDATBgNVHSUEDDAKBggr
-BgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdEQQiMCCCDmxvY2FsaG9zdDo1
-NDUzgg4xMjcuMC4wLjE6NTQ1MzAKBggqhkjOPQQDAgNIADBFAiEA2zpJEPQyz6/l
-Wf86aX6PepsntZv2GYlA5UpabfT2EZICICpJ5h/iI+i341gBmLiAFQOyTDT+/wQc
-6MF9+Yw1Yy0t
------END CERTIFICATE-----`)
-	keyPem := []byte(`-----BEGIN EC PRIVATE KEY-----
-MHcCAQEEIIrYSSNQFaA2Hwf1duRSxKtLYX5CB04fSeQ6tF1aY/PuoAoGCCqGSM49
-AwEHoUQDQgAEPR3tU2Fta9ktY+6P9G0cWO+0kETA6SFs38GecTyudlHz6xvCdz8q
-EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
------END EC PRIVATE KEY-----`)
-	destdir, err := os.MkdirTemp("", "weblistener")
-	if err == nil {
-		defer func() {
-			if err := os.RemoveAll(destdir); err != nil {
-				t.Error(err)
-			}
-		}()
-		if err = os.WriteFile(path.Join(destdir, webserv.FullchainPem), certPem, 0640); err == nil {
-			if err = os.WriteFile(path.Join(destdir, webserv.PrivkeyPem), keyPem, 0640); err == nil {
-				fn(destdir)
-			}
-		}
-	}
-	if err != nil {
-		t.Error(err)
-	}
-}
+var (
+	flagListen  = flag.String("listen", "", "serve HTTP requests on given [address][:port]")
+	flagCertDir = flag.String("certdir", "", "where to find fullchain.pem and privkey.pem")
+	flagUser    = flag.String("user", "", "switch to this user after startup (*nix only)")
+	flagDataDir = flag.String("datadir", "", "where to store data files after startup")
+)
 
-func ExampleConfig_Apply() {
+func Example() {
+	flag.Parse()
+
 	cfg := webserv.Config{
-		Listen: "127.0.0.1:8080", // leave empty for all addresses and default port
+		Listen:               *flagListen,
+		CertDir:              *flagCertDir,
+		User:                 *flagUser,
+		DataDir:              *flagDataDir,
+		DefaultDataDirSuffix: "webserv_example",
 	}
-	if l, err := cfg.Apply(os.Stdout); err == nil {
+
+	if l, err := cfg.Apply(log.Default()); err == nil {
 		defer l.Close()
-		fmt.Print(cfg.ListenURL)
+		log.Print("listening on", cfg.ListenURL)
 	} else {
-		fmt.Print(err)
+		log.Fatal(err)
 	}
-	// Output:
-	// http://localhost:8080
 }
