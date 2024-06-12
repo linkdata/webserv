@@ -40,7 +40,7 @@ func Listener(listenAddr, certDir string) (l net.Listener, listenUrl, absCertDir
 			l, err = net.Listen("tcp", defaultAddress(listenAddr, ":80", ":8080"))
 		}
 		if l != nil {
-			listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenAddrString(l))
+			listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenUrlString(l))
 		}
 	}
 	return
@@ -56,7 +56,7 @@ func defaultAddress(address, defaultpriv, defaultother string) string {
 	return address
 }
 
-func listenAddrString(l net.Listener) (addr string) {
+func listenUrlString(l net.Listener) (addr string) {
 	addr = l.Addr().String()
 	if host, port, err := net.SplitHostPort(addr); err == nil {
 		if ip := net.ParseIP(host); ip != nil {
