@@ -1,6 +1,7 @@
 package webserv_test
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"testing"
@@ -42,4 +43,16 @@ EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func ExampleConfig_Apply() {
+	var cfg webserv.Config
+	if l, err := cfg.Apply(os.Stdout); err == nil {
+		defer l.Close()
+		fmt.Print("OK")
+	} else {
+		fmt.Print(err)
+	}
+	// Output:
+	// OK
 }
