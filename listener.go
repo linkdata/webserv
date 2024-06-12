@@ -12,7 +12,8 @@ const (
 	PrivkeyPem   = "privkey.pem"
 )
 
-// Listener creates a net.Listener given an optional preferred address or port and an optional directory.
+// Listener creates a net.Listener given an optional preferred address or port
+// and an optional directory containing certificate files.
 //
 // If certDir is not empty, it calls LoadCert to load fullchain.pem and privkey.pem.
 //
