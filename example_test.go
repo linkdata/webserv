@@ -3,6 +3,9 @@ package webserv_test
 import (
 	"flag"
 	"log"
+	"net/http"
+	"os"
+	"time"
 
 	"github.com/linkdata/webserv"
 )
@@ -24,10 +27,19 @@ func Example() {
 		DataDir: *flagDataDir,
 	}
 
-	if l, err := cfg.Apply(log.Default()); err == nil {
+	l, err := cfg.Apply(log.Default())
+	if err == nil {
 		defer l.Close()
 		log.Printf("listening on %q", cfg.ListenURL)
-	} else {
-		log.Fatal(err)
+		http.DefaultServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("<html><body>Hello world!</body></html>"))
+		})
+		go func() {
+			time.Sleep(time.Second)
+			log.Printf("goodbye!")
+			os.Exit(0)
+		}()
+		err = http.Serve(l, nil)
 	}
+	log.Fatal(err)
 }
