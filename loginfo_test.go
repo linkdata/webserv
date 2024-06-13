@@ -2,43 +2,47 @@ package webserv_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/linkdata/webserv"
 )
 
-type printfer struct {
-	called bool
+type printlner struct {
+	str string
 }
 
-func (x *printfer) Printf(msg string, args ...any) {
-	x.called = true
+func (x *printlner) Println(args ...any) {
+	x.str += fmt.Sprint(args...)
 }
 
 type infoer struct {
-	called bool
+	str string
 }
 
 func (x *infoer) Info(msg string, args ...any) {
-	x.called = true
+	x.str += msg
 }
 
 func TestLogInfo(t *testing.T) {
-	a := printfer{}
+	a := printlner{}
 	webserv.LogInfo(&a, "a")
-	if !a.called {
-		t.Error("printfer failed")
+	webserv.LogInfo(&a, "\na\n")
+	if a.str != "a\na" {
+		t.Errorf("%q", a.str)
 	}
 
 	b := infoer{}
-	webserv.LogInfo(&b, "a")
-	if !b.called {
-		t.Error("infoer failed")
+	webserv.LogInfo(&b, "b")
+	webserv.LogInfo(&b, "\nb\n")
+	if b.str != "b\nb" {
+		t.Errorf("%q", b.str)
 	}
 
 	var c bytes.Buffer
 	webserv.LogInfo(&c, "c")
-	if c.Len() != 1 {
-		t.Error("io.Writer failed")
+	webserv.LogInfo(&c, "\nc\n")
+	if c.String() != "c\n\nc\n" {
+		t.Errorf("%q", c.String())
 	}
 }
