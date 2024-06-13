@@ -2,7 +2,7 @@ package webserv_test
 
 import (
 	"flag"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -17,6 +17,15 @@ var (
 	flagDataDir = flag.String("datadir", "$HOME", "where to store data files after startup")
 )
 
+// make sure we don't time out on the Go playground
+func dontTimeOutOnGoPlayground() {
+	go func() {
+		time.Sleep(time.Second)
+		slog.Info("goodbye!")
+		os.Exit(0)
+	}()
+}
+
 func Example() {
 	flag.Parse()
 
@@ -27,19 +36,15 @@ func Example() {
 		DataDir: *flagDataDir,
 	}
 
-	l, err := cfg.Apply(log.Default())
+	l, err := cfg.Apply(slog.Default())
 	if err == nil {
 		defer l.Close()
-		log.Printf("listening on %q", cfg.ListenURL)
+		slog.Info("listening", "address", l.Addr(), "url", cfg.ListenURL)
 		http.DefaultServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("<html><body>Hello world!</body></html>"))
 		})
-		go func() {
-			time.Sleep(time.Second)
-			log.Printf("goodbye!")
-			os.Exit(0)
-		}()
+		dontTimeOutOnGoPlayground()
 		err = http.Serve(l, nil)
 	}
-	log.Fatal(err)
+	slog.Error(err.Error())
 }

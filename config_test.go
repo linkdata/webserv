@@ -2,6 +2,7 @@ package webserv_test
 
 import (
 	"bytes"
+	"log/slog"
 	"os"
 	"testing"
 
@@ -20,7 +21,7 @@ func TestConfig_Apply(t *testing.T) {
 			DataDir: homeDir,
 		}
 		var buf bytes.Buffer
-		l, err := cfg.Apply(&buf)
+		l, err := cfg.Apply(slog.New(slog.NewTextHandler(&buf, nil)))
 		if err != nil {
 			t.Error(err)
 		}

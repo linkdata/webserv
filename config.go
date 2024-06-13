@@ -1,6 +1,7 @@
 package webserv
 
 import (
+	"log/slog"
 	"net"
 )
 
@@ -13,17 +14,15 @@ type Config struct {
 	ListenURL            string // after Apply called, an URL we listen on (e.g. "https://localhost:8443")
 }
 
-func logInfoQuoted(logger any, msg, val string) {
-	if val != "" {
-		LogInfo(logger, "%s %q\n", msg, val)
+func logInfo(logger *slog.Logger, msg, key, val string) {
+	if logger != nil && val != "" {
+		logger.Info(msg, key, val)
 	}
 }
 
 // Apply performs initial setup for a simple web server, optionally
 // logging informational messages if it loads certificates, switches
 // the current user, or switches to the data directory.
-//
-// The logger argument can be a log.Logger, a slog.Logger or an io.Writer.
 //
 // First it loads certificates if CertDir is set, and then starts a net.Listener
 // (TLS or normal). The listener will default to all addresses and standard port
@@ -39,14 +38,14 @@ func logInfoQuoted(logger any, msg, val string) {
 //
 // On a non-error return, CertDir and DataDir will be absolute paths or empty, and
 // ListenURL will be a printable and connectable URL like "http://localhost:80".
-func (cfg *Config) Apply(logger any) (l net.Listener, err error) {
+func (cfg *Config) Apply(logger *slog.Logger) (l net.Listener, err error) {
 	if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Listen, cfg.CertDir); err == nil {
-		logInfoQuoted(logger, "loaded certificate from", cfg.CertDir)
+		logInfo(logger, "loaded certificates", "dir", cfg.CertDir)
 		if err = BecomeUser(cfg.User); err == nil {
-			logInfoQuoted(logger, "switched to user", cfg.User)
+			logInfo(logger, "user switched", "user", cfg.User)
 			if cfg.DataDir, err = DefaultDataDir(cfg.DataDir, cfg.DefaultDataDirSuffix); err == nil {
 				if cfg.DataDir, err = UseDataDir(cfg.DataDir); err == nil {
-					logInfoQuoted(logger, "running in data directory", cfg.DataDir)
+					logInfo(logger, "using data directory", "dir", cfg.DataDir)
 				}
 			}
 		}
