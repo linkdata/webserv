@@ -15,7 +15,8 @@ import (
 // environment variables accordingly. It unsets XDG_CONFIG_HOME.
 //
 // Returns ErrBecomeUserNotImplemented if the current OS is not supported.
-func BecomeUser(userName string) (err error) {
+func BecomeUser(userName string) error {
+	var err error
 	if userName != "" {
 		var u *user.User
 		if u, err = user.Lookup(userName); err == nil {
@@ -34,5 +35,5 @@ func BecomeUser(userName string) (err error) {
 			}
 		}
 	}
-	return
+	return newErrBecomeUser(userName, err)
 }

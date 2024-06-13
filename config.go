@@ -1,6 +1,8 @@
 package webserv
 
-import "net"
+import (
+	"net"
+)
 
 type Config struct {
 	Listen               string // optional specific address (and/or port) to listen on
