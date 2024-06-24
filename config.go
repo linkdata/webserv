@@ -36,9 +36,9 @@ func logInfo(logger InfoLogger, msg, key, val string) {
 // If User is set it then switches to that user and the users primary group.
 // Note that this is not supported on Windows.
 //
-// If DataDir or DefaultDataDirSuffix is set, changes the current working
-// directory. If DataDirMode is nonzero, the directory will be created
-// if necessary.
+// If DataDir or DefaultDataDirSuffix is set, calculates the absolute
+// data directory path and sets DataDir. If DataDirMode is nonzero, the
+// directory will be created if necessary.
 //
 // On a non-error return, CertDir and DataDir will be absolute paths or be empty,
 // and ListenURL will be a printable and connectable URL like "http://localhost:80".
@@ -49,7 +49,7 @@ func (cfg *Config) Apply(logger InfoLogger) (l net.Listener, err error) {
 			logInfo(logger, "user switched", "user", cfg.User)
 			if cfg.DataDir, err = DefaultDataDir(cfg.DataDir, cfg.DefaultDataDirSuffix); err == nil {
 				if cfg.DataDir, err = UseDataDir(cfg.DataDir, cfg.DataDirMode); err == nil {
-					logInfo(logger, "using data directory", "dir", cfg.DataDir)
+					logInfo(logger, "data directory", "dir", cfg.DataDir)
 				}
 			}
 		}
