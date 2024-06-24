@@ -26,6 +26,7 @@ package main
 import (
 	"flag"
 	"log/slog"
+	"net/http"
 
 	"github.com/linkdata/webserv"
 )
