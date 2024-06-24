@@ -29,6 +29,9 @@ func TestConfig_Apply(t *testing.T) {
 		if l != nil {
 			t.Logf("Apply():\n%#+v\n%s", cfg, buf.String())
 			l.Close()
+			if buf.Len() == 0 {
+				t.Error(buf.String())
+			}
 		}
 	})
 }

@@ -2,7 +2,6 @@ package webserv
 
 import (
 	"io/fs"
-	"log/slog"
 	"net"
 )
 
@@ -18,7 +17,7 @@ type Config struct {
 	ListenURL            string      // after Apply called, an URL we listen on (e.g. "https://localhost:8443")
 }
 
-func logInfo(logger *slog.Logger, msg, key, val string) {
+func logInfo(logger InfoLogger, msg, key, val string) {
 	if logger != nil && val != "" {
 		logger.Info(msg, key, val)
 	}
@@ -43,7 +42,7 @@ func logInfo(logger *slog.Logger, msg, key, val string) {
 //
 // On a non-error return, CertDir and DataDir will be absolute paths or be empty,
 // and ListenURL will be a printable and connectable URL like "http://localhost:80".
-func (cfg *Config) Apply(logger *slog.Logger) (l net.Listener, err error) {
+func (cfg *Config) Apply(logger InfoLogger) (l net.Listener, err error) {
 	if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Listen, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem); err == nil {
 		logInfo(logger, "loaded certificates", "dir", cfg.CertDir)
 		if err = BecomeUser(cfg.User); err == nil {
