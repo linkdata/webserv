@@ -12,7 +12,7 @@ type Config struct {
 	FullchainPem         string      // set to override filename for "fullchain.pem"
 	PrivkeyPem           string      // set to override filename for "privkey.pem"
 	User                 string      // if set, user to switch to after opening listening port
-	DataDir              string      // if set, ensure this directory exists and switch to it
+	DataDir              string      // if set, change current directory to it
 	DataDirMode          fs.FileMode // if nonzero, create DataDir if it does not exist using this mode
 	DefaultDataDirSuffix string      // if set and DataDir is not set, use the user's default data dir plus this suffix
 	ListenURL            string      // after Apply called, an URL we listen on (e.g. "https://localhost:8443")
