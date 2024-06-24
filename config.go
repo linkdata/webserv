@@ -1,17 +1,21 @@
 package webserv
 
 import (
+	"io/fs"
 	"log/slog"
 	"net"
 )
 
 type Config struct {
-	Listen               string // optional specific address (and/or port) to listen on
-	CertDir              string // if set, directory to look for fullchain.pem and privkey.pem
-	User                 string // if set, user to switch to after opening listening port
-	DataDir              string // if set, ensure this directory exists and switch to it
-	DefaultDataDirSuffix string // if set and DataDir is not set, use the user's default data dir plus this suffix
-	ListenURL            string // after Apply called, an URL we listen on (e.g. "https://localhost:8443")
+	Listen               string      // optional specific address (and/or port) to listen on
+	CertDir              string      // if set, directory to look for fullchain.pem and privkey.pem
+	FullchainPem         string      // set to override filename for "fullchain.pem"
+	PrivkeyPem           string      // set to override filename for "privkey.pem"
+	User                 string      // if set, user to switch to after opening listening port
+	DataDir              string      // if set, ensure this directory exists and switch to it
+	DataDirMode          fs.FileMode // if nonzero, create DataDir if it does not exist using this mode
+	DefaultDataDirSuffix string      // if set and DataDir is not set, use the user's default data dir plus this suffix
+	ListenURL            string      // after Apply called, an URL we listen on (e.g. "https://localhost:8443")
 }
 
 func logInfo(logger *slog.Logger, msg, key, val string) {
@@ -33,18 +37,19 @@ func logInfo(logger *slog.Logger, msg, key, val string) {
 // If User is set it then switches to that user and the users primary group.
 // Note that this is not supported on Windows.
 //
-// If DataDir or DefaultDataDirSuffix is set, creates that directory if needed
-// and sets the current working directory to it.
+// If DataDir or DefaultDataDirSuffix is set, changes the current working
+// directory. If DataDirMode is nonzero, the directory will be created
+// if nessecary.
 //
-// On a non-error return, CertDir and DataDir will be absolute paths or empty, and
-// ListenURL will be a printable and connectable URL like "http://localhost:80".
+// On a non-error return, CertDir and DataDir will be absolute paths or be empty,
+// and ListenURL will be a printable and connectable URL like "http://localhost:80".
 func (cfg *Config) Apply(logger *slog.Logger) (l net.Listener, err error) {
-	if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Listen, cfg.CertDir); err == nil {
+	if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Listen, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem); err == nil {
 		logInfo(logger, "loaded certificates", "dir", cfg.CertDir)
 		if err = BecomeUser(cfg.User); err == nil {
 			logInfo(logger, "user switched", "user", cfg.User)
 			if cfg.DataDir, err = DefaultDataDir(cfg.DataDir, cfg.DefaultDataDirSuffix); err == nil {
-				if cfg.DataDir, err = UseDataDir(cfg.DataDir); err == nil {
+				if cfg.DataDir, err = UseDataDir(cfg.DataDir, cfg.DataDirMode); err == nil {
 					logInfo(logger, "using data directory", "dir", cfg.DataDir)
 				}
 			}

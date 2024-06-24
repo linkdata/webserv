@@ -7,7 +7,7 @@ import (
 )
 
 func TestLoadCert(t *testing.T) {
-	cert, absDir, err := webserv.LoadCert("")
+	cert, absDir, err := webserv.LoadCert("", "", "")
 	if err != nil {
 		t.Error(err)
 	}
@@ -18,7 +18,7 @@ func TestLoadCert(t *testing.T) {
 		t.Error(absDir)
 	}
 	withCertFiles(t, func(destdir string) {
-		cert, absDir, err := webserv.LoadCert(destdir)
+		cert, absDir, err := webserv.LoadCert(destdir, "", "")
 		if err != nil {
 			t.Error(err)
 		}

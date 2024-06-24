@@ -1,10 +1,15 @@
 package webserv
 
 import (
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 )
+
+// DataDirPermissions is the permissions UseDataDir()
+// passes on to os.MkdirAll().
+var DataDirPermissions = fs.FileMode(0750)
 
 // DefaultDataDir returns dataDir if not empty, otherwise if
 // defaultSuffix is not empty it returns the joined path
@@ -20,18 +25,25 @@ func DefaultDataDir(dataDir, defaultSuffix string) (string, error) {
 	return dataDir, err
 }
 
-// UseDataDir expands environment variables in dataDir,
-// transforms it into an absolute path, creates it if
-// it does not exist and finally changes current directory
-// to that path.
+func mkdirAll(dataDir string, mode fs.FileMode) (err error) {
+	if mode != 0 {
+		err = os.MkdirAll(dataDir, mode)
+	}
+	return
+}
+
+// UseDataDir does nothing if dataDir is empty, otherwise it expands
+// environment variables and transforms it into an absolute path.
+// Then, if mode is not zero, it creates the path if it does not exist.
+// Finally, it finally changes the current directory to it.
 //
-// Returns the final path.
-func UseDataDir(dataDir string) (string, error) {
+// Returns the final path or an empty string if dataDir was empty.
+func UseDataDir(dataDir string, mode fs.FileMode) (string, error) {
 	var err error
 	if dataDir != "" {
 		dataDir = os.ExpandEnv(dataDir)
 		if dataDir, err = filepath.Abs(dataDir); err == nil {
-			if err = os.MkdirAll(dataDir, 0750); err == nil {
+			if err = mkdirAll(dataDir, mode); err == nil {
 				err = os.Chdir(dataDir)
 			}
 		}

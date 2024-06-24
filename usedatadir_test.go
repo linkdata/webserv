@@ -26,7 +26,7 @@ func TestDefaultDataDir(t *testing.T) {
 }
 
 func TestUseDataDir(t *testing.T) {
-	got, err := webserv.UseDataDir(".")
+	got, err := webserv.UseDataDir(".", 0750)
 	if err != nil {
 		t.Error(err)
 	}

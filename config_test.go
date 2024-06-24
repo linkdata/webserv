@@ -16,9 +16,10 @@ func TestConfig_Apply(t *testing.T) {
 			homeDir = ""
 		}
 		cfg := &webserv.Config{
-			CertDir: destdir,
-			User:    os.Getenv("USER"),
-			DataDir: homeDir,
+			CertDir:     destdir,
+			User:        os.Getenv("USER"),
+			DataDir:     homeDir,
+			DataDirMode: 0750,
 		}
 		var buf bytes.Buffer
 		l, err := cfg.Apply(slog.New(slog.NewTextHandler(&buf, nil)))
