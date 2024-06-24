@@ -39,7 +39,7 @@ func logInfo(logger *slog.Logger, msg, key, val string) {
 //
 // If DataDir or DefaultDataDirSuffix is set, changes the current working
 // directory. If DataDirMode is nonzero, the directory will be created
-// if nessecary.
+// if necessary.
 //
 // On a non-error return, CertDir and DataDir will be absolute paths or be empty,
 // and ListenURL will be a printable and connectable URL like "http://localhost:80".
