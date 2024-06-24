@@ -25,7 +25,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	"log/slog"
 
 	"github.com/linkdata/webserv"
 )
@@ -47,15 +47,15 @@ func main() {
 		DataDir: *flagDataDir,
 	}
 
-	l, err := cfg.Apply(log.Default())
+	l, err := cfg.Apply(slog.Default())
 	if err == nil {
 		defer l.Close()
-		log.Printf("listening on %q", cfg.ListenURL)
+		slog.Info("listening", "address", l.Addr(), "url", cfg.ListenURL)
 		http.DefaultServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("<html><body>Hello world!</body></html>"))
 		})
 		err = http.Serve(l, nil)
 	}
-	log.Fatal(err)
+	slog.Error(err.Error())
 }
 ```
