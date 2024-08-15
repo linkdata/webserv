@@ -104,7 +104,10 @@ func (cfg *Config) ServeWith(ctx context.Context, l net.Listener, srv *http.Serv
 	err := srv.Serve(l)
 	if err == http.ErrServerClosed {
 		// wait for breakChan to close, discarding signals
-		for range breakChan {
+		for {
+			if _, ok := <-breakChan; !ok {
+				break
+			}
 		}
 	}
 	return err
