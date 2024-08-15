@@ -13,8 +13,7 @@ Given a listen address, certificate directory, user name and data directory:
 * If the listen address does not specify a port, default port depends on initial user privileges and if we have a certificate.
 * Starts listening on the address and port.
 * If user name is given, switch to that user.
-* If data directory is given, create it if needed and then switch current directory to it.
-
+* If data directory is given, create it if needed.
 
 ## Usage
 
@@ -42,20 +41,20 @@ func main() {
 	flag.Parse()
 
 	cfg := webserv.Config{
-		Listen:  *flagListen,
+		Address: *flagListen,
 		CertDir: *flagCertDir,
 		User:    *flagUser,
 		DataDir: *flagDataDir,
+		Logger:  slog.Default(),
 	}
 
-	l, err := cfg.Apply(slog.Default())
+	http.DefaultServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("<html><body>Hello world!</body></html>"))
+	})
+
+	l, err := cfg.Listen()
 	if err == nil {
-		defer l.Close()
-		slog.Info("listening", "address", l.Addr(), "url", cfg.ListenURL)
-		http.DefaultServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte("<html><body>Hello world!</body></html>"))
-		})
-		err = http.Serve(l, nil)
+		err = cfg.Serve(context.Background(), l, nil)
 	}
 	slog.Error(err.Error())
 }
