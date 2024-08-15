@@ -38,7 +38,7 @@ func (cfg *Config) logInfo(msg string, keyValuePairs ...any) {
 	if cfg.Logger != nil && len(keyValuePairs) > 1 {
 		s, ok := keyValuePairs[1].(string)
 		if !(ok && s == "") {
-			cfg.Logger.Info(msg, keyValuePairs...)
+			cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
 		}
 	}
 }
@@ -76,15 +76,13 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 	return
 }
 
-// Serve sets up a signal handler to catch SIGINT and SIGTERM and then
-// calls http.Serve.
-func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error {
+// ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then
+// calls srv.Serve(l). If the context is cancelled or a signal is received,
+// calls srv.Shutdown(ctx).
+// Returns the error from srv.Serve(), normally http.ErrServerClosed.
+func (cfg *Config) ServeWith(ctx context.Context, l net.Listener, srv *http.Server) error {
 	breakChan := make(chan os.Signal, 1)
 	signal.Notify(breakChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	srv := &http.Server{
-		Handler:           handler,
-		ReadHeaderTimeout: time.Second * 5,
-	}
 	cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
 	go func() {
 		cfg.mu.Lock()
@@ -93,14 +91,31 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
 		select {
 		case sig, ok := <-cfg.breakChan:
 			if ok {
-				close(breakChan)
+				defer close(breakChan)
 				cfg.logInfo("received signal", "sig", sig.String())
 			}
 		case <-ctx.Done():
+			defer close(breakChan)
+			cfg.logInfo("context done", "err", context.Cause(ctx))
 		}
+		signal.Stop(breakChan)
 		_ = srv.Shutdown(ctx)
 	}()
-	return srv.Serve(l)
+	err := srv.Serve(l)
+	if err == http.ErrServerClosed {
+		// wait for breakChan to close
+		<-breakChan
+	}
+	return err
+}
+
+// Serve creates a http.Server with reasonable defaults and calls ServeWith.
+func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error {
+	srv := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: time.Second * 5,
+	}
+	return cfg.ServeWith(ctx, l, srv)
 }
 
 // ListenAndServe calls Listen followed by Serve.

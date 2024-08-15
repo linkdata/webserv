@@ -81,9 +81,10 @@ func TestConfig_ListenAndServe_Cancelled(t *testing.T) {
 		if err != http.ErrServerClosed {
 			t.Error(err)
 		}
-		if buf.Len() == 0 {
-			t.Error("no log output")
+		s := buf.String()
+		t.Log(s)
+		if !strings.Contains(s, "context done") {
+			t.Error("expected 'context done' in log output")
 		}
-		t.Log(buf.String())
 	})
 }
