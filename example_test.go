@@ -5,8 +5,6 @@ import (
 	"flag"
 	"log/slog"
 	"net/http"
-	"syscall"
-	"time"
 
 	"github.com/linkdata/webserv"
 )
@@ -17,14 +15,6 @@ var (
 	flagUser    = flag.String("user", "www-data", "switch to this user after startup (*nix only)")
 	flagDataDir = flag.String("datadir", "$HOME", "where to store data files after startup")
 )
-
-// make sure we don't time out on the Go playground
-func dontTimeOutOnGoPlayground() {
-	go func() {
-		time.Sleep(time.Second)
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
-	}()
-}
 
 func Example() {
 	flag.Parse()
@@ -43,7 +33,6 @@ func Example() {
 
 	l, err := cfg.Listen()
 	if err == nil {
-		dontTimeOutOnGoPlayground()
 		err = cfg.Serve(context.Background(), l, nil)
 	}
 	slog.Error(err.Error())
