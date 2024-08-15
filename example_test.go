@@ -1,10 +1,11 @@
 package webserv_test
 
 import (
+	"context"
 	"flag"
 	"log/slog"
 	"net/http"
-	"os"
+	"syscall"
 	"time"
 
 	"github.com/linkdata/webserv"
@@ -21,8 +22,7 @@ var (
 func dontTimeOutOnGoPlayground() {
 	go func() {
 		time.Sleep(time.Second)
-		slog.Info("goodbye!")
-		os.Exit(0)
+		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 	}()
 }
 
@@ -30,21 +30,21 @@ func Example() {
 	flag.Parse()
 
 	cfg := webserv.Config{
-		Listen:  *flagListen,
+		Address: *flagListen,
 		CertDir: *flagCertDir,
 		User:    *flagUser,
 		DataDir: *flagDataDir,
+		Logger:  slog.Default(),
 	}
 
-	l, err := cfg.Apply(slog.Default())
+	http.DefaultServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("<html><body>Hello world!</body></html>"))
+	})
+
+	l, err := cfg.Listen()
 	if err == nil {
-		defer l.Close()
-		slog.Info("listening", "address", l.Addr(), "url", cfg.ListenURL)
-		http.DefaultServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte("<html><body>Hello world!</body></html>"))
-		})
 		dontTimeOutOnGoPlayground()
-		err = http.Serve(l, nil)
+		err = cfg.Serve(context.Background(), l, nil)
 	}
 	slog.Error(err.Error())
 }

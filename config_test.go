@@ -2,36 +2,88 @@ package webserv_test
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
+	"net/http"
 	"os"
+	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/linkdata/webserv"
 )
 
-func TestConfig_Apply(t *testing.T) {
+func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 	withCertFiles(t, func(destdir string) {
 		homeDir := os.Getenv("HOME")
 		if st, err := os.Stat(homeDir); err != nil || !st.IsDir() {
 			homeDir = ""
 		}
+		var buf bytes.Buffer
 		cfg := &webserv.Config{
 			CertDir:     destdir,
 			User:        os.Getenv("USER"),
 			DataDir:     homeDir,
 			DataDirMode: 0750,
+			Logger:      slog.New(slog.NewTextHandler(&buf, nil)),
 		}
-		var buf bytes.Buffer
-		l, err := cfg.Apply(slog.New(slog.NewTextHandler(&buf, nil)))
-		if err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+		go func() {
+			waited := 0
+			for cfg.BreakChan() == nil {
+				if waited > 500 {
+					t.Error("timeout waiting for server to start")
+					return
+				}
+			}
+			cfg.BreakChan() <- syscall.SIGUSR1
+		}()
+		err := cfg.ListenAndServe(ctx, nil)
+		if err != http.ErrServerClosed {
 			t.Error(err)
 		}
-		if l != nil {
-			t.Logf("Apply():\n%#+v\n%s", cfg, buf.String())
-			l.Close()
-			if buf.Len() == 0 {
-				t.Error(buf.String())
-			}
+		s := buf.String()
+		t.Log(s)
+		if !strings.Contains(s, "signal") {
+			t.Error("expected 'signal' in log output")
 		}
+	})
+}
+
+func TestConfig_ListenAndServe_Cancelled(t *testing.T) {
+	withCertFiles(t, func(destdir string) {
+		homeDir := os.Getenv("HOME")
+		if st, err := os.Stat(homeDir); err != nil || !st.IsDir() {
+			homeDir = ""
+		}
+		var buf bytes.Buffer
+		cfg := &webserv.Config{
+			CertDir:     destdir,
+			User:        os.Getenv("USER"),
+			DataDir:     homeDir,
+			DataDirMode: 0750,
+			Logger:      slog.New(slog.NewTextHandler(&buf, nil)),
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			defer cancel()
+			waited := 0
+			for cfg.BreakChan() == nil {
+				if waited > 500 {
+					t.Error("timeout waiting for server to start")
+					return
+				}
+			}
+		}()
+		err := cfg.ListenAndServe(ctx, nil)
+		if err != http.ErrServerClosed {
+			t.Error(err)
+		}
+		if buf.Len() == 0 {
+			t.Error("no log output")
+		}
+		t.Log(buf.String())
 	})
 }
