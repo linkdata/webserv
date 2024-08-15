@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 )
 
 type Config struct {
@@ -80,7 +81,10 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error {
 	breakChan := make(chan os.Signal, 1)
 	signal.Notify(breakChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	srv := &http.Server{Handler: handler}
+	srv := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: time.Second * 5,
+	}
 	cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
 	go func() {
 		cfg.mu.Lock()
@@ -94,7 +98,7 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
 			}
 		case <-ctx.Done():
 		}
-		srv.Shutdown(ctx)
+		_ = srv.Shutdown(ctx)
 	}()
 	return srv.Serve(l)
 }
