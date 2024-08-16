@@ -3,8 +3,8 @@ package webserv_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
-	"net/http"
 	"os"
 	"strings"
 	"syscall"
@@ -41,7 +41,7 @@ func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 			cfg.BreakChan() <- syscall.SIGUSR1
 		}()
 		err := cfg.ListenAndServe(ctx, nil)
-		if err != http.ErrServerClosed {
+		if err != nil {
 			t.Error(err)
 		}
 		s := buf.String()
@@ -78,7 +78,7 @@ func TestConfig_ListenAndServe_Cancelled(t *testing.T) {
 			}
 		}()
 		err := cfg.ListenAndServe(ctx, nil)
-		if err != http.ErrServerClosed {
+		if !errors.Is(err, context.Canceled) {
 			t.Error(err)
 		}
 		s := buf.String()

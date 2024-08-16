@@ -27,6 +27,7 @@ type Config struct {
 	breakChan            chan os.Signal // break channel
 }
 
+// BreakChan returns the break signalling channel, or nil if not yet started serving requests.
 func (cfg *Config) BreakChan() (ch chan<- os.Signal) {
 	cfg.mu.Lock()
 	ch = cfg.breakChan
@@ -76,11 +77,11 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 	return
 }
 
-// ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then
-// calls srv.Serve(l). If the context is cancelled or a signal is received,
-// calls srv.Shutdown(ctx).
-// Returns the error from srv.Serve(), normally http.ErrServerClosed.
-func (cfg *Config) ServeWith(ctx context.Context, l net.Listener, srv *http.Server) error {
+// ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls srv.Serve(l).
+//
+// If the context is cancelled or a signal is received, calls srv.Shutdown(ctx).
+// Returns nil if the server started successfully and then cleanly shut down.
+func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) error {
 	breakChan := make(chan os.Signal, 1)
 	signal.Notify(breakChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
@@ -102,12 +103,14 @@ func (cfg *Config) ServeWith(ctx context.Context, l net.Listener, srv *http.Serv
 		_ = srv.Shutdown(ctx)
 	}()
 	err := srv.Serve(l)
-	if err == http.ErrServerClosed {
-		// wait for breakChan to close, discarding signals
-		for {
-			if _, ok := <-breakChan; !ok {
-				break
+	for err == http.ErrServerClosed {
+		select {
+		case _, ok := <-breakChan:
+			if !ok {
+				err = nil
 			}
+		case <-ctx.Done():
+			return context.Cause(ctx)
 		}
 	}
 	return err
@@ -119,7 +122,7 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
 		Handler:           handler,
 		ReadHeaderTimeout: time.Second * 5,
 	}
-	return cfg.ServeWith(ctx, l, srv)
+	return cfg.ServeWith(ctx, srv, l)
 }
 
 // ListenAndServe calls Listen followed by Serve.
