@@ -55,7 +55,9 @@ func main() {
 
 	l, err := cfg.Listen()
 	if err == nil {
-		err = cfg.Serve(context.Background(), l, nil)
+		if err = cfg.Serve(context.Background(), l, nil); err == nil {
+			return
+		}
 	}
 	slog.Error(err.Error())
 }
