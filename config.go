@@ -90,7 +90,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 		cfg.breakChan = breakChan
 		cfg.mu.Unlock()
 		select {
-		case sig, ok := <-cfg.breakChan:
+		case sig, ok := <-breakChan:
 			if ok {
 				defer close(breakChan)
 				cfg.logInfo("received signal", "sig", sig.String())
