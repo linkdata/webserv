@@ -5,7 +5,7 @@
 
 # webserv
 
-Thin web server stub.
+Thin web service library.
 
 Given a listen address, certificate directory, user name and data directory:
 
@@ -14,6 +14,7 @@ Given a listen address, certificate directory, user name and data directory:
 * Starts listening on the address and port.
 * If user name is given, switch to that user.
 * If data directory is given, create it if needed.
+* When serving, listen for SIGINT and SIGTERM and do a controlled shutdown.
 
 ## Usage
 
