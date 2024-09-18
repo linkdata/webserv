@@ -56,21 +56,21 @@ func defaultAddress(address, defaultpriv, defaultother string) string {
 	return address
 }
 
-func listenCertHost(cert *tls.Certificate) (host string) {
+func localhostOrDNSName(cert *tls.Certificate) string {
 	if cert != nil && cert.Leaf != nil && len(cert.Leaf.DNSNames) > 0 {
-		host, _, _ = net.SplitHostPort(cert.Leaf.DNSNames[0])
+		if host, _, err := net.SplitHostPort(cert.Leaf.DNSNames[0]); err == nil {
+			return host
+		}
 	}
-	return
+	return "localhost"
 }
 
 func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) {
 	addr = l.Addr().String()
 	if host, port, err := net.SplitHostPort(addr); err == nil {
 		if ip := net.ParseIP(host); ip != nil {
-			if s := listenCertHost(cert); s != "" {
-				addr = net.JoinHostPort(s, port)
-			} else if ip.IsUnspecified() || ip.IsLoopback() {
-				addr = net.JoinHostPort("localhost", port)
+			if ip.IsUnspecified() || ip.IsLoopback() {
+				addr = net.JoinHostPort(localhostOrDNSName(cert), port)
 			}
 		}
 	}
