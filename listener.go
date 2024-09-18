@@ -40,7 +40,7 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem string) (l net.Liste
 			l, err = net.Listen("tcp", defaultAddress(listenAddr, ":80", ":8080"))
 		}
 		if l != nil {
-			listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenUrlString(l))
+			listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenUrlString(l, cert))
 		}
 	}
 	return
@@ -56,11 +56,20 @@ func defaultAddress(address, defaultpriv, defaultother string) string {
 	return address
 }
 
-func listenUrlString(l net.Listener) (addr string) {
+func listenCertHost(cert *tls.Certificate) (host string) {
+	if cert != nil && cert.Leaf != nil && len(cert.Leaf.DNSNames) > 0 {
+		host, _, _ = net.SplitHostPort(cert.Leaf.DNSNames[0])
+	}
+	return
+}
+
+func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) {
 	addr = l.Addr().String()
 	if host, port, err := net.SplitHostPort(addr); err == nil {
 		if ip := net.ParseIP(host); ip != nil {
-			if ip.IsUnspecified() || ip.IsLoopback() {
+			if s := listenCertHost(cert); s != "" {
+				addr = net.JoinHostPort(s, port)
+			} else if ip.IsUnspecified() || ip.IsLoopback() {
 				addr = net.JoinHostPort("localhost", port)
 			}
 		}
