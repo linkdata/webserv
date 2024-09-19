@@ -58,9 +58,11 @@ func defaultAddress(address, defaultpriv, defaultother string) string {
 
 func localhostOrDNSName(cert *tls.Certificate) string {
 	if cert != nil && cert.Leaf != nil && len(cert.Leaf.DNSNames) > 0 {
-		if host, _, err := net.SplitHostPort(cert.Leaf.DNSNames[0]); err == nil {
-			return host
+		name := cert.Leaf.DNSNames[0]
+		if host, _, err := net.SplitHostPort(name); err == nil {
+			name = host
 		}
+		return name
 	}
 	return "localhost"
 }
