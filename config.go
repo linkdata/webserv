@@ -61,9 +61,10 @@ func (cfg *Config) logInfo(msg string, keyValuePairs ...any) {
 // directory will be created if necessary.
 //
 // On a non-error return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty,
-// and cfg.ListenURL will be a printable and connectable URL like "http://localhost:80".
+// and if cfg.ListenURL was empty it will be set to a best-guess printable and connectable
+// URL like "http://localhost:80".
 func (cfg *Config) Listen() (l net.Listener, err error) {
-	if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem); err == nil {
+	if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL); err == nil {
 		cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
 		if err = BecomeUser(cfg.User); err == nil {
 			cfg.logInfo("user switched", "user", cfg.User)

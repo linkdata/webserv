@@ -24,7 +24,7 @@ const (
 //
 // Returns the net.Listener and listenURL if there was no error.
 // If certificates were successfully loaded, absCertDir will be the absolute path to that directory.
-func Listener(listenAddr, certDir, fullchainPem, privkeyPem string) (l net.Listener, listenUrl, absCertDir string, err error) {
+func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) {
 	var cert *tls.Certificate
 	if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil {
 		var schemesuffix string
@@ -40,7 +40,9 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem string) (l net.Liste
 			l, err = net.Listen("tcp", defaultAddress(listenAddr, ":80", ":8080"))
 		}
 		if l != nil {
-			listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenUrlString(l, cert))
+			if listenUrl = overrideUrl; listenUrl == "" {
+				listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenUrlString(l, cert))
+			}
 		}
 	}
 	return
