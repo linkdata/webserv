@@ -18,10 +18,10 @@ type Config struct {
 	FullchainPem         string         // set to override filename for "fullchain.pem"
 	PrivkeyPem           string         // set to override filename for "privkey.pem"
 	User                 string         // if set, user to switch to after opening listening port
-	DataDir              string         // if set, change current directory to it
+	DataDir              string         // if set, create this directory, if unset will be filled in after Listen
+	DefaultDataDirSuffix string         // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
 	DataDirMode          fs.FileMode    // if nonzero, create DataDir if it does not exist using this mode
-	DefaultDataDirSuffix string         // if set and DataDir is not set, use the user's default data dir plus this suffix
-	ListenURL            string         // after Listen called, an URL we listen on (e.g. "https://localhost:8443")
+	ListenURL            string         // if set, the external URL clients can reach us at, if unset will be filled in after Listen (e.g. "https://localhost:8443")
 	Logger               InfoLogger     // logger to use, if nil logs nothing
 	mu                   sync.Mutex     // protects following
 	breakChan            chan os.Signal // break channel
