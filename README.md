@@ -48,7 +48,7 @@ func envOrDefault(envvar, defval string) (s string) {
 	return
 }
 
-func Example() {
+func main() {
 	flag.Parse()
 
 	cfg := webserv.Config{
