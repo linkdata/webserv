@@ -22,7 +22,7 @@ type Config struct {
 	DefaultDataDirSuffix string         // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
 	DataDirMode          fs.FileMode    // if nonzero, create DataDir if it does not exist using this mode
 	ListenURL            string         // if set, the external URL clients can reach us at, if unset will be filled in after Listen (e.g. "https://localhost:8443")
-	Logger               InfoLogger     // logger to use, if nil logs nothing
+	Logger               Logger         // logger to use, if nil logs nothing
 	mu                   sync.Mutex     // protects following
 	breakChan            chan os.Signal // break channel
 }
