@@ -4,7 +4,6 @@ import (
 	"net"
 	"os"
 	"path"
-	"strings"
 	"testing"
 
 	"github.com/linkdata/webserv"
@@ -54,15 +53,16 @@ func TestRandomPort(t *testing.T) {
 	if gotListener == nil {
 		t.Fatal("no listener")
 	}
-	if !strings.HasPrefix(gotUrl, "http://localhost:") {
-		t.Error(gotUrl)
-	}
 	_, p, err := net.SplitHostPort(gotListener.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(gotUrl, p) {
-		t.Error(gotUrl)
+	if len(p) < 2 {
+		t.Error(p)
+	}
+	want := "http://localhost:" + p
+	if gotUrl != want {
+		t.Errorf("want %q got %q", want, gotUrl)
 	}
 }
 
