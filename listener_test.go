@@ -3,6 +3,7 @@ package webserv_test
 import (
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/linkdata/webserv"
@@ -41,6 +42,19 @@ EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
 	}
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestRandomPort(t *testing.T) {
+	gotListener, gotUrl, _, err := webserv.Listener("localhost:", "", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotListener == nil {
+		t.Fatal("no listener")
+	}
+	if !strings.HasPrefix(gotUrl, "http://localhost:") {
+		t.Error(gotUrl)
 	}
 }
 
