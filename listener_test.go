@@ -1,6 +1,7 @@
 package webserv_test
 
 import (
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -54,6 +55,13 @@ func TestRandomPort(t *testing.T) {
 		t.Fatal("no listener")
 	}
 	if !strings.HasPrefix(gotUrl, "http://localhost:") {
+		t.Error(gotUrl)
+	}
+	_, p, err := net.SplitHostPort(gotListener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(gotUrl, p) {
 		t.Error(gotUrl)
 	}
 }
