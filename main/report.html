@@ -1,0 +1,490 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>webserv: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/linkdata/webserv/becomeuser_unix.go (100.0%)</option>
+				
+				<option value="file1">github.com/linkdata/webserv/config.go (100.0%)</option>
+				
+				<option value="file2">github.com/linkdata/webserv/errbecomeuser.go (100.0%)</option>
+				
+				<option value="file3">github.com/linkdata/webserv/listener.go (100.0%)</option>
+				
+				<option value="file4">github.com/linkdata/webserv/loadcert.go (100.0%)</option>
+				
+				<option value="file5">github.com/linkdata/webserv/usedatadir.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">//go:build unix || linux
+
+package webserv
+
+import (
+        "os"
+        "os/user"
+        "strconv"
+        "syscall"
+)
+
+// BecomeUser switches to the given userName if not empty.
+//
+// It sets the GID, UID and changes the USER and HOME
+// environment variables accordingly. It unsets XDG_CONFIG_HOME.
+//
+// Returns ErrBecomeUserNotImplemented if the current OS is not supported.
+func BecomeUser(userName string) error <span class="cov8" title="1">{
+        var err error
+        if userName != "" </span><span class="cov8" title="1">{
+                var u *user.User
+                if u, err = user.Lookup(userName); err == nil </span><span class="cov8" title="1">{
+                        var uid, gid int
+                        if uid, err = strconv.Atoi(u.Uid); err == nil </span><span class="cov8" title="1">{
+                                if gid, err = strconv.Atoi(u.Gid); err == nil </span><span class="cov8" title="1">{
+                                        if err = syscall.Setgid(gid); err == nil </span><span class="cov8" title="1">{
+                                                if err = syscall.Setuid(uid); err == nil </span><span class="cov8" title="1">{
+                                                        _ = os.Unsetenv("XDG_CONFIG_HOME")
+                                                        if err = os.Setenv("HOME", u.HomeDir); err == nil </span><span class="cov8" title="1">{
+                                                                err = os.Setenv("USER", u.Username)
+                                                        }</span>
+                                                }
+                                        }
+                                }
+                        }
+                }
+        }
+        <span class="cov8" title="1">return newErrBecomeUser(userName, err)</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package webserv
+
+import (
+        "context"
+        "io/fs"
+        "net"
+        "net/http"
+        "os"
+        "os/signal"
+        "sync"
+        "syscall"
+        "time"
+)
+
+type Config struct {
+        Address              string         // optional specific address (and/or port) to listen on
+        CertDir              string         // if set, directory to look for fullchain.pem and privkey.pem
+        FullchainPem         string         // set to override filename for "fullchain.pem"
+        PrivkeyPem           string         // set to override filename for "privkey.pem"
+        User                 string         // if set, user to switch to after opening listening port
+        DataDir              string         // if set, create this directory, if unset will be filled in after Listen
+        DefaultDataDirSuffix string         // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
+        DataDirMode          fs.FileMode    // if nonzero, create DataDir if it does not exist using this mode
+        ListenURL            string         // if set, the external URL clients can reach us at, if unset will be filled in after Listen (e.g. "https://localhost:8443")
+        Logger               Logger         // logger to use, if nil logs nothing
+        mu                   sync.Mutex     // protects following
+        breakChan            chan os.Signal // break channel
+}
+
+// BreakChan returns the break signalling channel, or nil if not yet started serving requests.
+func (cfg *Config) BreakChan() (ch chan&lt;- os.Signal) <span class="cov8" title="1">{
+        cfg.mu.Lock()
+        ch = cfg.breakChan
+        cfg.mu.Unlock()
+        return
+}</span>
+
+func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov8" title="1">{
+        if cfg.Logger != nil &amp;&amp; len(keyValuePairs) &gt; 1 </span><span class="cov8" title="1">{
+                s, ok := keyValuePairs[1].(string)
+                if !(ok &amp;&amp; s == "") </span><span class="cov8" title="1">{
+                        cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
+                }</span>
+        }
+}
+
+// Listen performs initial setup for a simple web server and returns a
+// net.Listener if successful.
+//
+// First it loads certificates if cfg.CertDir is set, and then starts a net.Listener
+// (TLS or normal). The listener will default to all addresses and standard port
+// depending on privileges and if a certificate was loaded or not.
+//
+// If cfg.Address was set, any address or port given there overrides these defaults.
+//
+// If cfg.User is set it then switches to that user and the users primary group.
+// Note that this is not supported on Windows.
+//
+// If cfg.DataDir or cfg.DefaultDataDirSuffix is set, calculates the absolute
+// data directory path and sets cfg.DataDir. If cfg.DataDirMode is nonzero, the
+// directory will be created if necessary.
+//
+// On a non-error return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty,
+// and if cfg.ListenURL was empty it will be set to a best-guess printable and connectable
+// URL like "http://localhost:80".
+func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov8" title="1">{
+        if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL); err == nil </span><span class="cov8" title="1">{
+                cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
+                if err = BecomeUser(cfg.User); err == nil </span><span class="cov8" title="1">{
+                        cfg.logInfo("user switched", "user", cfg.User)
+                        if cfg.DataDir, err = DefaultDataDir(cfg.DataDir, cfg.DefaultDataDirSuffix); err == nil </span><span class="cov8" title="1">{
+                                if cfg.DataDir, err = UseDataDir(cfg.DataDir, cfg.DataDirMode); err == nil </span><span class="cov8" title="1">{
+                                        cfg.logInfo("data directory", "dir", cfg.DataDir)
+                                }</span>
+                        }
+                }
+        }
+        <span class="cov8" title="1">return</span>
+}
+
+// ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls srv.Serve(l).
+//
+// If the context is cancelled or a signal is received, calls srv.Shutdown(ctx).
+// Returns nil if the server started successfully and then cleanly shut down.
+func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) error <span class="cov8" title="1">{
+        breakChan := make(chan os.Signal, 1)
+        signal.Notify(breakChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+        cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
+        go func() </span><span class="cov8" title="1">{
+                cfg.mu.Lock()
+                cfg.breakChan = breakChan
+                cfg.mu.Unlock()
+                select </span>{
+                case sig, ok := &lt;-breakChan:<span class="cov8" title="1">
+                        if ok </span><span class="cov8" title="1">{
+                                defer close(breakChan)
+                                cfg.logInfo("received signal", "sig", sig.String())
+                        }</span>
+                case &lt;-ctx.Done():<span class="cov8" title="1">
+                        defer close(breakChan)
+                        cfg.logInfo("context done", "err", context.Cause(ctx))</span>
+                }
+                <span class="cov8" title="1">signal.Stop(breakChan)
+                _ = srv.Shutdown(ctx)</span>
+        }()
+        <span class="cov8" title="1">err := srv.Serve(l)
+        for err == http.ErrServerClosed </span><span class="cov8" title="1">{
+                select </span>{
+                case _, ok := &lt;-breakChan:<span class="cov8" title="1">
+                        if !ok </span><span class="cov8" title="1">{
+                                err = nil
+                        }</span>
+                case &lt;-ctx.Done():<span class="cov8" title="1">
+                        return context.Cause(ctx)</span>
+                }
+        }
+        <span class="cov8" title="1">return err</span>
+}
+
+// Serve creates a http.Server with reasonable defaults and calls ServeWith.
+func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error <span class="cov8" title="1">{
+        srv := &amp;http.Server{
+                Handler:           handler,
+                ReadHeaderTimeout: time.Second * 5,
+        }
+        return cfg.ServeWith(ctx, srv, l)
+}</span>
+
+// ListenAndServe calls Listen followed by Serve.
+func (cfg *Config) ListenAndServe(ctx context.Context, handler http.Handler) (err error) <span class="cov8" title="1">{
+        if err = ctx.Err(); err == nil </span><span class="cov8" title="1">{
+                var l net.Listener
+                if l, err = cfg.Listen(); err == nil </span><span class="cov8" title="1">{
+                        err = cfg.Serve(ctx, l, handler)
+                }</span>
+        }
+        <span class="cov8" title="1">return</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package webserv
+
+import "fmt"
+
+type errBecomeUser struct {
+        userName string
+        err      error
+}
+
+var ErrBecomeUser = errBecomeUser{}
+
+func (e errBecomeUser) Error() string <span class="cov8" title="1">{
+        return fmt.Sprintf("BecomeUser(\"%s\"): %v", e.userName, e.err)
+}</span>
+
+func (e errBecomeUser) Is(other error) (yes bool) <span class="cov8" title="1">{
+        _, yes = other.(errBecomeUser)
+        return
+}</span>
+
+func (e errBecomeUser) Unwrap() error <span class="cov8" title="1">{
+        return e.err
+}</span>
+
+func newErrBecomeUser(userName string, err error) error <span class="cov8" title="1">{
+        if err != nil </span><span class="cov8" title="1">{
+                err = errBecomeUser{userName: userName, err: err}
+        }</span>
+        <span class="cov8" title="1">return err</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package webserv
+
+import (
+        "crypto/tls"
+        "fmt"
+        "net"
+        "os"
+)
+
+const (
+        FullchainPem = "fullchain.pem"
+        PrivkeyPem   = "privkey.pem"
+)
+
+// Listener creates a net.Listener given an optional preferred address or port
+// and an optional directory containing certificate files.
+//
+// If certDir is not empty, it calls LoadCert to load fullchain.pem and privkey.pem.
+//
+// The listener will default to all addresses and standard port
+// depending on privileges and if a certificate was loaded or not.
+//
+// These defaults can be overridden with the listenAddr argument.
+//
+// Returns the net.Listener and listenURL if there was no error.
+// If certificates were successfully loaded, absCertDir will be the absolute path to that directory.
+func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) <span class="cov8" title="1">{
+        var cert *tls.Certificate
+        if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil </span><span class="cov8" title="1">{
+                var schemesuffix string
+                if cert != nil </span><span class="cov8" title="1">{
+                        schemesuffix = "s"
+                        l, err = tls.Listen("tcp", defaultAddress(listenAddr, ":443", ":8443"),
+                                &amp;tls.Config{
+                                        Certificates: []tls.Certificate{*cert},
+                                        MinVersion:   tls.VersionTLS13,
+                                },
+                        )
+                }</span> else<span class="cov8" title="1"> {
+                        l, err = net.Listen("tcp", defaultAddress(listenAddr, ":80", ":8080"))
+                }</span>
+                <span class="cov8" title="1">if l != nil </span><span class="cov8" title="1">{
+                        if listenUrl = overrideUrl; listenUrl == "" </span><span class="cov8" title="1">{
+                                listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenUrlString(l, cert))
+                        }</span>
+                }
+        }
+        <span class="cov8" title="1">return</span>
+}
+
+func defaultAddress(address, defaultpriv, defaultother string) string <span class="cov8" title="1">{
+        if address == "" </span><span class="cov8" title="1">{
+                address = defaultpriv
+                if os.Geteuid() &gt; 0 </span><span class="cov8" title="1">{
+                        address = defaultother
+                }</span>
+        }
+        <span class="cov8" title="1">return address</span>
+}
+
+func localhostOrDNSName(cert *tls.Certificate) string <span class="cov8" title="1">{
+        if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span><span class="cov8" title="1">{
+                name := cert.Leaf.DNSNames[0]
+                if host, _, err := net.SplitHostPort(name); err == nil </span><span class="cov8" title="1">{
+                        name = host
+                }</span>
+                <span class="cov8" title="1">return name</span>
+        }
+        <span class="cov8" title="1">return "localhost"</span>
+}
+
+func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) <span class="cov8" title="1">{
+        addr = l.Addr().String()
+        if host, port, err := net.SplitHostPort(addr); err == nil </span><span class="cov8" title="1">{
+                if ip := net.ParseIP(host); ip != nil </span><span class="cov8" title="1">{
+                        if ip.IsUnspecified() || ip.IsLoopback() </span><span class="cov8" title="1">{
+                                addr = net.JoinHostPort(localhostOrDNSName(cert), port)
+                        }</span>
+                }
+        }
+        <span class="cov8" title="1">return</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package webserv
+
+import (
+        "crypto/tls"
+        "os"
+        "path"
+        "path/filepath"
+)
+
+// LoadCert does nothing if certDir is empty, otherwise it expands
+// environment variables and transforms it into an absolute path.
+// It then tries to load a X509 key pair from the files named fullchainPem
+// and privkeyPem from the resulting directory.
+//
+// If fullchainPem is empty, it defaults to "fullchain.pem".
+// If privkeyPem is empty, it defaults to "privkey.pem".
+//
+// Return a non-nil cert and absolute path to certDir if there are no errors.
+func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, absCertDir string, err error) <span class="cov8" title="1">{
+        if certDir != "" </span><span class="cov8" title="1">{
+                certDir = os.ExpandEnv(certDir)
+                if absCertDir, err = filepath.Abs(certDir); err == nil </span><span class="cov8" title="1">{
+                        var cer tls.Certificate
+                        if fullchainPem == "" </span><span class="cov8" title="1">{
+                                fullchainPem = FullchainPem
+                        }</span>
+                        <span class="cov8" title="1">if privkeyPem == "" </span><span class="cov8" title="1">{
+                                privkeyPem = PrivkeyPem
+                        }</span>
+                        <span class="cov8" title="1">fc := path.Join(absCertDir, fullchainPem)
+                        pk := path.Join(absCertDir, privkeyPem)
+                        if cer, err = tls.LoadX509KeyPair(fc, pk); err == nil </span><span class="cov8" title="1">{
+                                cert = &amp;cer
+                        }</span>
+                }
+        }
+        <span class="cov8" title="1">return</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package webserv
+
+import (
+        "io/fs"
+        "os"
+        "path"
+        "path/filepath"
+)
+
+// DefaultDataDir returns dataDir if not empty, otherwise if
+// defaultSuffix is not empty it returns the joined path
+// of os.UserConfigDir() and defaultSuffix.
+func DefaultDataDir(dataDir, defaultSuffix string) (string, error) <span class="cov8" title="1">{
+        var err error
+        if dataDir == "" &amp;&amp; defaultSuffix != "" </span><span class="cov8" title="1">{
+                dataDir, err = os.UserConfigDir()
+                if err == nil </span><span class="cov8" title="1">{
+                        dataDir = path.Join(dataDir, defaultSuffix)
+                }</span>
+        }
+        <span class="cov8" title="1">return dataDir, err</span>
+}
+
+// UseDataDir expands environment variables in dataDir and transforms
+// it into an absolute path. Then, if mode is not zero, it creates
+// the path if it does not exist. Does nothing if dataDir is empty.
+//
+// Returns the final path or an empty string if dataDir was empty.
+func UseDataDir(dataDir string, mode fs.FileMode) (string, error) <span class="cov8" title="1">{
+        var err error
+        if dataDir != "" </span><span class="cov8" title="1">{
+                dataDir = os.ExpandEnv(dataDir)
+                if dataDir, err = filepath.Abs(dataDir); err == nil </span><span class="cov8" title="1">{
+                        if mode != 0 </span><span class="cov8" title="1">{
+                                err = os.MkdirAll(dataDir, mode)
+                        }</span>
+                }
+        }
+        <span class="cov8" title="1">return dataDir, err</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
