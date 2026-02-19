@@ -74,6 +74,10 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 				}
 			}
 		}
+		if err != nil {
+			_ = l.Close()
+			l = nil
+		}
 	}
 	return
 }
