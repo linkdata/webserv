@@ -16,6 +16,7 @@ Given a listen address, certificate directory, user name and data directory:
 * If user name is given, switch to that user.
 * If data directory is given, create it if needed.
 * When serving, listen for SIGINT and SIGTERM and do a controlled shutdown.
+* Path values are treated as trusted config: certificate filenames and data-dir suffixes may use `..` and symlinks and can resolve outside their base directories.
 
 ## Usage
 

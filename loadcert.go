@@ -2,21 +2,19 @@ package webserv
 
 import (
 	"crypto/tls"
-	"errors"
 	"os"
 	"path"
 	"path/filepath"
 )
-
-var ErrPathOutsideCertDir = errors.New("path is outside certificate directory")
 
 // LoadCert does nothing if certDir is empty, otherwise it expands
 // environment variables and transforms it into an absolute path.
 // It then tries to load a X509 key pair from the files named fullchainPem
 // and privkeyPem from the resulting directory.
 //
-// The filenames may contain paths and symlinks, which will be followed
-// outside of certDir if applicable.
+// The filenames may contain paths, ".." segments and symlinks.
+// They are not confined to certDir, so they may resolve outside of it.
+// Caller is responsible for validating or sandboxing untrusted path input.
 //
 // If fullchainPem is empty, it defaults to "fullchain.pem".
 // If privkeyPem is empty, it defaults to "privkey.pem".

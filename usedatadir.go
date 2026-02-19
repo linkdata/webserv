@@ -10,8 +10,9 @@ import (
 // defaultSuffix is not empty it returns the joined path
 // of os.UserConfigDir() and defaultSuffix.
 //
-// defaultSuffix may contain paths and symlinks, which will be followed
-// outside of dataDir if applicable.
+// dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
+// They are not confined to UserConfigDir, so they may resolve outside of it.
+// Caller is responsible for validating or sandboxing untrusted path input.
 func DefaultDataDir(dataDir, defaultSuffix string) (string, error) {
 	var err error
 	if dataDir == "" && defaultSuffix != "" {
