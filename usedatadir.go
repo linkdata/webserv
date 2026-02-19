@@ -16,13 +16,17 @@ import (
 // Caller is responsible for validating or sandboxing untrusted path input.
 func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) {
 	result = dataDir
-	if dataDir == "" && defaultSuffix != "" {
-		result, err = os.UserConfigDir()
-		if err == nil {
-			defaultSuffix = os.ExpandEnv(defaultSuffix)
+	if result == "" {
+		if defaultSuffix != "" {
+			if result, err = os.UserConfigDir(); err == nil {
+				result = path.Join(result, defaultSuffix)
+			}
 		}
 	}
-	result, err = filepath.Abs(path.Join(result, defaultSuffix))
+	if err == nil && result != "" {
+		result = os.ExpandEnv(result)
+		result, err = filepath.Abs(result)
+	}
 	return
 }
 

@@ -23,9 +23,17 @@ func TestDefaultDataDir(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	want, _ := filepath.Abs(path.Join("foo", "suffix"))
+	want, _ := filepath.Abs(path.Join("foo"))
 	if got != want {
 		t.Error(got)
+	}
+
+	got, err = webserv.DefaultDataDir("", "")
+	if err != nil {
+		t.Error(err)
+	}
+	if got != "" {
+		t.Errorf("want empty data dir, got %q", got)
 	}
 }
 

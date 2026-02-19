@@ -258,6 +258,23 @@ func TestConfigListen_ErrorAfterBindMayPopulateListenURL(t *testing.T) {
 	}
 }
 
+func TestConfigListen_EmptyDataDirStaysEmpty(t *testing.T) {
+	cfg := &webserv.Config{
+		Address: "127.0.0.1:0",
+	}
+
+	l, err := cfg.Listen()
+	if l != nil {
+		_ = l.Close()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DataDir != "" {
+		t.Fatalf("expected empty DataDir, got %q", cfg.DataDir)
+	}
+}
+
 func TestConfigServeWith_PropagatesShutdownContextError(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("process signalling from tests is not reliable on windows")
