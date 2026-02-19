@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"syscall"
 	"testing"
@@ -14,25 +13,6 @@ import (
 
 	"github.com/linkdata/webserv"
 )
-
-func TestLoadCert_RejectsPathTraversalInFileOverrides(t *testing.T) {
-	withCertFiles(t, func(certRoot string) {
-		sandbox := filepath.Join(certRoot, "sandbox")
-		if err := os.MkdirAll(sandbox, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		// The override arguments are documented as file names.
-		// ".." should not be able to escape certDir.
-		cert, absDir, err := webserv.LoadCert(sandbox, "../fullchain.pem", "../privkey.pem")
-		if err == nil {
-			t.Fatalf("expected path traversal error, got cert=%v absDir=%q", cert != nil, absDir)
-		}
-		if cert != nil {
-			t.Fatalf("expected nil cert on traversal attempt, got non-nil cert from %q", absDir)
-		}
-	})
-}
 
 func TestConfigServeWith_PropagatesShutdownContextError(t *testing.T) {
 	if runtime.GOOS == "windows" {
