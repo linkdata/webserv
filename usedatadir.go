@@ -1,29 +1,24 @@
 package webserv
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // DefaultDataDir returns dataDir if not empty, otherwise if
 // defaultSuffix is not empty it returns the joined path
 // of os.UserConfigDir() and defaultSuffix.
+//
+// defaultSuffix may contain paths and symlinks, which will be followed
+// outside of dataDir if applicable.
 func DefaultDataDir(dataDir, defaultSuffix string) (string, error) {
 	var err error
 	if dataDir == "" && defaultSuffix != "" {
 		dataDir, err = os.UserConfigDir()
 		if err == nil {
 			defaultSuffix = os.ExpandEnv(defaultSuffix)
-			baseDir := filepath.Clean(dataDir)
-			candidate := filepath.Clean(filepath.Join(baseDir, defaultSuffix))
-			rel, relErr := filepath.Rel(baseDir, candidate)
-			if relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-				return "", fmt.Errorf("invalid DefaultDataDir suffix %q", defaultSuffix)
-			}
-			dataDir = candidate
+			dataDir = filepath.Join(dataDir, defaultSuffix)
 		}
 	}
 	return dataDir, err
