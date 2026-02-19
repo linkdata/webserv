@@ -27,8 +27,8 @@ func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, 
 			if privkeyPem == "" {
 				privkeyPem = PrivkeyPem
 			}
-			fc := path.Join(absCertDir, fullchainPem)
-			pk := path.Join(absCertDir, privkeyPem)
+			fc := path.Join(absCertDir, path.Base(fullchainPem))
+			pk := path.Join(absCertDir, path.Base(privkeyPem))
 			if cer, err = tls.LoadX509KeyPair(fc, pk); err == nil {
 				cert = &cer
 			}
