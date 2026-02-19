@@ -185,3 +185,52 @@ func TestBecomeUser_GroupIDParseErrorStopsBeforeSetgid(t *testing.T) {
 	}
 }
 
+func TestGroupIDsFn_DefaultImplementation(t *testing.T) {
+	saved := captureBecomeUserFns()
+	defer restoreBecomeUserFns(saved)
+
+	var u *user.User
+	var err error
+	if u, err = user.Current(); err == nil {
+		var want []string
+		if want, err = u.GroupIds(); err == nil {
+			var got []string
+			if got, err = groupIDsFn(u); err == nil {
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("groupIDsFn() = %v, want %v", got, want)
+				}
+			}
+		}
+	}
+	if err != nil {
+		t.Skipf("unable to resolve current user groups for default groupIDsFn test: %v", err)
+	}
+}
+
+func TestBecomeUser_RootWithoutSupplementaryGroupsFallsBackToPrimaryGroup(t *testing.T) {
+	saved := captureBecomeUserFns()
+	defer restoreBecomeUserFns(saved)
+
+	u := &user.User{Username: "svc", Uid: "101", Gid: "201", HomeDir: "/tmp/svc"}
+	gotGroups := []int(nil)
+
+	lookupUserFn = func(_ string) (*user.User, error) { return u, nil }
+	groupIDsFn = func(_ *user.User) ([]string, error) { return []string{}, nil }
+	geteuidFn = func() int { return 0 }
+	setgroupsFn = func(gids []int) error {
+		gotGroups = append([]int{}, gids...)
+		return nil
+	}
+	setgidFn = func(_ int) error { return nil }
+	setuidFn = func(_ int) error { return nil }
+	unsetenvFn = func(_ string) error { return nil }
+	setenvFn = func(_, _ string) error { return nil }
+
+	if err := BecomeUser("svc"); err != nil {
+		t.Fatal(err)
+	}
+	wantGroups := []int{201}
+	if !reflect.DeepEqual(gotGroups, wantGroups) {
+		t.Fatalf("groups=%v want %v", gotGroups, wantGroups)
+	}
+}
