@@ -20,7 +20,7 @@ type Config struct {
 	DataDir              string      // if set, create this directory, if unset will be filled in after Listen
 	DefaultDataDirSuffix string      // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
 	DataDirMode          fs.FileMode // if nonzero, create DataDir if it does not exist using this mode
-	ListenURL            string      // if set, the external URL clients can reach us at, if unset will be filled in after Listen (e.g. "https://localhost:8443")
+	ListenURL            string      // if set, the external URL clients can reach us at. If unset, Listen may fill this in (e.g. "https://localhost:8443"), even when Listen later returns an error after binding.
 	Logger               Logger      // logger to use, if nil logs nothing
 }
 
@@ -49,9 +49,11 @@ func (cfg *Config) logInfo(msg string, keyValuePairs ...any) {
 // data directory path and sets cfg.DataDir. If cfg.DataDirMode is nonzero, the
 // directory will be created if necessary.
 //
-// On return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty,
-// and if cfg.ListenURL was empty it will be set to a best-guess printable and connectable
-// URL like "http://localhost:80".
+// On return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
+// If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
+// URL like "http://localhost:80" as soon as the socket is opened.
+// Therefore cfg.ListenURL can be non-empty even if Listen returns an error from a
+// later step, such as user switching or data directory setup.
 func (cfg *Config) Listen() (l net.Listener, err error) {
 	if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL); err == nil {
 		cfg.logInfo("loaded certificates", "dir", cfg.CertDir)

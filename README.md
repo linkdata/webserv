@@ -12,6 +12,7 @@ Given a listen address, certificate directory, user name and data directory:
 * If certificate directory is not blank, reads `fullchain.pem` and `privkey.pem` from it.
 * If the listen address does not specify a port, default port depends on initial user privileges and if we have a certificate.
 * Starts listening on the address and port.
+* If listening succeeds but a later setup step fails, `Listen()` still returns an error and closes the listener, but `cfg.ListenURL` may already have been populated.
 * If user name is given, switch to that user.
 * If data directory is given, create it if needed.
 * When serving, listen for SIGINT and SIGTERM and do a controlled shutdown.
