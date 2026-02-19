@@ -2,6 +2,7 @@ package webserv
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -32,5 +33,12 @@ func TestDefaultAddress_BracketedIPv6WithoutPort(t *testing.T) {
 
 	if got, want := defaultAddress("[::1]", "80", "8080"), "[::1]:"+httpDefault; got != want {
 		t.Fatalf("defaultAddress() = %q, want %q", got, want)
+	}
+}
+
+func TestDefaultAddress_MalformedBracketHostDoesNotBecomeWildcard(t *testing.T) {
+	got := defaultAddress("[]", "80", "8080")
+	if strings.HasPrefix(got, ":") {
+		t.Fatalf("defaultAddress() converted malformed host into wildcard listen address: %q", got)
 	}
 }

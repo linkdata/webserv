@@ -56,7 +56,10 @@ func defaultAddress(address, defaultpriv, defaultother string) (result string) {
 		if os.Geteuid() > 0 {
 			defaultPort = defaultother
 		}
-		result = net.JoinHostPort(strings.Trim(address, "[]"), defaultPort)
+		if len(address) > 2 && strings.HasPrefix(address, "[") && strings.HasSuffix(address, "]") {
+			address = address[1 : len(address)-1]
+		}
+		result = net.JoinHostPort(address, defaultPort)
 	}
 	return
 }
