@@ -76,6 +76,7 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 }
 
 // ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls srv.Serve(l).
+// If ctx is canceled, the server will be shut down and this function returns with ctx.Err().
 //
 // Returns nil if the server started successfully and then cleanly shut down.
 //
