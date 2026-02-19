@@ -90,6 +90,28 @@ import (
         "syscall"
 )
 
+var (
+        lookupUserFn = user.Lookup
+        groupIDsFn   = func(u *user.User) ([]string, error) <span class="cov8" title="1">{ return u.GroupIds() }</span>
+        geteuidFn    = os.Geteuid
+        setgroupsFn  = syscall.Setgroups
+        setgidFn     = syscall.Setgid
+        setuidFn     = syscall.Setuid
+        unsetenvFn   = os.Unsetenv
+        setenvFn     = os.Setenv
+)
+
+func parseGroupIDs(groupIDs []string) (gids []int, err error) <span class="cov8" title="1">{
+        gids = make([]int, 0, len(groupIDs))
+        for _, groupID := range groupIDs </span><span class="cov8" title="1">{
+                var gid int
+                if gid, err = strconv.Atoi(groupID); err == nil </span><span class="cov8" title="1">{
+                        gids = append(gids, gid)
+                }</span>
+        }
+        <span class="cov8" title="1">return</span>
+}
+
 // BecomeUser switches to the given userName if not empty.
 //
 // It sets the GID, UID and changes the USER and HOME
@@ -100,16 +122,30 @@ func BecomeUser(userName string) error <span class="cov8" title="1">{
         var err error
         if userName != "" </span><span class="cov8" title="1">{
                 var u *user.User
-                if u, err = user.Lookup(userName); err == nil </span><span class="cov8" title="1">{
+                if u, err = lookupUserFn(userName); err == nil </span><span class="cov8" title="1">{
                         var uid, gid int
                         if uid, err = strconv.Atoi(u.Uid); err == nil </span><span class="cov8" title="1">{
                                 if gid, err = strconv.Atoi(u.Gid); err == nil </span><span class="cov8" title="1">{
-                                        if err = syscall.Setgid(gid); err == nil </span><span class="cov8" title="1">{
-                                                if err = syscall.Setuid(uid); err == nil </span><span class="cov8" title="1">{
-                                                        _ = os.Unsetenv("XDG_CONFIG_HOME")
-                                                        if err = os.Setenv("HOME", u.HomeDir); err == nil </span><span class="cov8" title="1">{
-                                                                err = os.Setenv("USER", u.Username)
-                                                        }</span>
+                                        if geteuidFn() == 0 </span><span class="cov8" title="1">{
+                                                var groupIDs []string
+                                                if groupIDs, err = groupIDsFn(u); err == nil </span><span class="cov8" title="1">{
+                                                        var gids []int
+                                                        if gids, err = parseGroupIDs(groupIDs); err == nil </span><span class="cov8" title="1">{
+                                                                if len(gids) == 0 </span><span class="cov8" title="1">{
+                                                                        gids = []int{gid}
+                                                                }</span>
+                                                                <span class="cov8" title="1">err = setgroupsFn(gids)</span>
+                                                        }
+                                                }
+                                        }
+                                        <span class="cov8" title="1">if err == nil </span><span class="cov8" title="1">{
+                                                if err = setgidFn(gid); err == nil </span><span class="cov8" title="1">{
+                                                        if err = setuidFn(uid); err == nil </span><span class="cov8" title="1">{
+                                                                _ = unsetenvFn("XDG_CONFIG_HOME")
+                                                                if err = setenvFn("HOME", u.HomeDir); err == nil </span><span class="cov8" title="1">{
+                                                                        err = setenvFn("USER", u.Username)
+                                                                }</span>
+                                                        }
                                                 }
                                         }
                                 }
@@ -151,7 +187,7 @@ type Config struct {
 func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov8" title="1">{
         if cfg.Logger != nil &amp;&amp; len(keyValuePairs) &gt; 1 </span><span class="cov8" title="1">{
                 s, ok := keyValuePairs[1].(string)
-                if !(ok &amp;&amp; s == "") </span><span class="cov8" title="1">{
+                if !ok || s != "" </span><span class="cov8" title="1">{
                         cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
                 }</span>
         }
@@ -189,7 +225,10 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov8" title
                                 }</span>
                         }
                 }
-                <span class="cov8" title="1">if err != nil </span><span class="cov8" title="1">{
+        }
+        <span class="cov8" title="1">if err != nil </span><span class="cov8" title="1">{
+                cfg.DataDir = ""
+                if l != nil </span><span class="cov8" title="1">{
                         _ = l.Close()
                         l = nil
                 }</span>
@@ -453,26 +492,31 @@ func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, 
 import (
         "io/fs"
         "os"
+        "path"
         "path/filepath"
 )
 
-// DefaultDataDir returns dataDir if not empty, otherwise if
-// defaultSuffix is not empty it returns the joined path
+// DefaultDataDir returns the absolute path to dataDir if not empty, otherwise if
+// defaultSuffix is not empty it returns the absolute joined path
 // of os.UserConfigDir() and defaultSuffix.
 //
 // dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
 // They are not confined to UserConfigDir, so they may resolve outside of it.
 // Caller is responsible for validating or sandboxing untrusted path input.
-func DefaultDataDir(dataDir, defaultSuffix string) (string, error) <span class="cov8" title="1">{
-        var err error
-        if dataDir == "" &amp;&amp; defaultSuffix != "" </span><span class="cov8" title="1">{
-                dataDir, err = os.UserConfigDir()
-                if err == nil </span><span class="cov8" title="1">{
-                        defaultSuffix = os.ExpandEnv(defaultSuffix)
-                        dataDir = filepath.Join(dataDir, defaultSuffix)
-                }</span>
+func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <span class="cov8" title="1">{
+        result = dataDir
+        if result == "" </span><span class="cov8" title="1">{
+                if defaultSuffix != "" </span><span class="cov8" title="1">{
+                        if result, err = os.UserConfigDir(); err == nil </span><span class="cov8" title="1">{
+                                result = path.Join(result, defaultSuffix)
+                        }</span>
+                }
         }
-        <span class="cov8" title="1">return dataDir, err</span>
+        <span class="cov8" title="1">if err == nil &amp;&amp; result != "" </span><span class="cov8" title="1">{
+                result = os.ExpandEnv(result)
+                result, err = filepath.Abs(result)
+        }</span>
+        <span class="cov8" title="1">return</span>
 }
 
 // UseDataDir expands environment variables in dataDir and transforms
