@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 const (
@@ -55,7 +56,7 @@ func defaultAddress(address, defaultpriv, defaultother string) (result string) {
 		if os.Geteuid() > 0 {
 			defaultPort = defaultother
 		}
-		result = net.JoinHostPort(address, defaultPort)
+		result = net.JoinHostPort(strings.Trim(address, "[]"), defaultPort)
 	}
 	return
 }

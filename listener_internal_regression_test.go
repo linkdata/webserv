@@ -23,3 +23,14 @@ func TestDefaultAddress_HostWithoutPortGetsDefaultPort(t *testing.T) {
 		t.Fatalf("https defaultAddress() = %q, want %q", got, want)
 	}
 }
+
+func TestDefaultAddress_BracketedIPv6WithoutPort(t *testing.T) {
+	httpDefault := "80"
+	if os.Geteuid() > 0 {
+		httpDefault = "8080"
+	}
+
+	if got, want := defaultAddress("[::1]", "80", "8080"), "[::1]:"+httpDefault; got != want {
+		t.Fatalf("defaultAddress() = %q, want %q", got, want)
+	}
+}
