@@ -16,6 +16,7 @@ func DefaultDataDir(dataDir, defaultSuffix string) (string, error) {
 	if dataDir == "" && defaultSuffix != "" {
 		dataDir, err = os.UserConfigDir()
 		if err == nil {
+			defaultSuffix = os.ExpandEnv(defaultSuffix)
 			baseDir := filepath.Clean(dataDir)
 			candidate := filepath.Clean(filepath.Join(baseDir, defaultSuffix))
 			rel, relErr := filepath.Rel(baseDir, candidate)
