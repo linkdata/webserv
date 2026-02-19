@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 
 func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("os.Interrupt signalling from tests is not reliable on windows")
+		t.Skip("process signalling from tests is not reliable on windows")
 	}
 	withCertFiles(t, func(destdir string) {
 		homeDir := os.Getenv("HOME")
@@ -34,9 +35,14 @@ func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 		go func() {
-			time.Sleep(50 * time.Millisecond)
-			if p, err := os.FindProcess(os.Getpid()); err == nil {
-				_ = p.Signal(os.Interrupt)
+			for {
+				time.Sleep(50 * time.Millisecond)
+				if p, err := os.FindProcess(os.Getpid()); err == nil {
+					if err = p.Signal(syscall.SIGTERM); err != nil {
+						t.Error(err)
+					}
+					return
+				}
 			}
 		}()
 		err := cfg.ListenAndServe(ctx, nil)
@@ -47,6 +53,9 @@ func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 		t.Log(s)
 		if !strings.Contains(s, "signal") {
 			t.Error("expected 'signal' in log output")
+		}
+		if !strings.Contains(s, "terminated") {
+			t.Error("expected 'terminated' signal name in log output")
 		}
 	})
 }
@@ -76,8 +85,8 @@ func TestConfig_ListenAndServe_Cancelled(t *testing.T) {
 		}
 		s := buf.String()
 		t.Log(s)
-		if !strings.Contains(s, "context done") {
-			t.Error("expected 'context done' in log output")
+		if !strings.Contains(s, "context canceled") {
+			t.Error("expected 'context canceled' in log output")
 		}
 	})
 }

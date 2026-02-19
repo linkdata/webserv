@@ -76,27 +76,30 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 // If the context is cancelled or a signal is received, calls srv.Shutdown(ctx).
 // Returns nil if the server started successfully and then cleanly shut down.
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) {
-	serveDone := make(chan struct{})
+	serveErr := make(chan error, 1)
 	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
 	go func() {
-		select {
-		case <-sigCtx.Done():
-			if ctx.Err() == nil {
-				cfg.logInfo("received signal", "sig", "interrupt")
-			} else {
-				cfg.logInfo("context done", "err", context.Cause(ctx))
-			}
-		case <-serveDone:
-			return
-		}
-		_ = srv.Shutdown(ctx)
+		serveErr <- srv.Serve(l)
 	}()
-	err = srv.Serve(l)
-	close(serveDone)
+	select {
+	case err = <-serveErr:
+	case <-sigCtx.Done():
+		reason := "interrupted"
+		if err = ctx.Err(); err != nil {
+			reason = err.Error()
+		} else {
+			if cause := context.Cause(sigCtx); cause != nil {
+				reason = cause.Error()
+			}
+		}
+		cfg.logInfo("stopped", "reason", reason)
+		_ = srv.Shutdown(ctx)
+		<-serveErr
+	}
 	if err == http.ErrServerClosed {
-		err = context.Cause(ctx)
+		err = nil
 	}
 	return err
 }
