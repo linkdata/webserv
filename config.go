@@ -75,7 +75,6 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 
 // ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls srv.Serve(l).
 //
-// If the context is cancelled or a signal is received, calls srv.Shutdown(ctx).
 // Returns nil if the server started successfully and then cleanly shut down.
 //
 // Panics if any of the arguments are nil.
@@ -99,7 +98,9 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 			}
 		}
 		cfg.logInfo("stopped", "reason", reason)
-		shutdownErr := srv.Shutdown(ctx)
+		shutdownCtx, shutdownCancel := context.WithTimeout(ctx, time.Second)
+		shutdownErr := srv.Shutdown(shutdownCtx)
+		shutdownCancel()
 		serveExitErr := <-serveErr
 		if err == nil {
 			if shutdownErr != nil {
