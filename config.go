@@ -29,7 +29,7 @@ type Config struct {
 func (cfg *Config) logInfo(msg string, keyValuePairs ...any) {
 	if cfg.Logger != nil && len(keyValuePairs) > 1 {
 		s, ok := keyValuePairs[1].(string)
-		if !(ok && s == "") {
+		if !ok || s != "" {
 			cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
 		}
 	}
