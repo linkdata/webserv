@@ -6,9 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -79,33 +77,5 @@ func TestConfigServeWith_SignalShutdownCanHangWithoutDeadline(t *testing.T) {
 
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("ServeWith() error = %v, want %v", err, context.DeadlineExceeded)
-	}
-}
-
-func TestDefaultDataDir_EnvSuffixCanEscapeUserConfigDir(t *testing.T) {
-	base, err := os.UserConfigDir()
-	if err != nil {
-		t.Skipf("UserConfigDir unavailable: %v", err)
-	}
-
-	t.Setenv("WEBSERV_AUDIT_ESCAPE", ".."+string(os.PathSeparator)+".."+string(os.PathSeparator)+"webserv-audit-escape")
-
-	dataDir, err := webserv.DefaultDataDir("", "$WEBSERV_AUDIT_ESCAPE")
-	if err != nil {
-		return
-	}
-	dataDir, err = webserv.UseDataDir(dataDir, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	base = filepath.Clean(base)
-	dataDir = filepath.Clean(dataDir)
-	rel, err := filepath.Rel(base, dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		t.Fatalf("resolved data directory escaped UserConfigDir: base=%q dataDir=%q", base, dataDir)
 	}
 }

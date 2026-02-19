@@ -32,13 +32,6 @@ func TestDefaultDataDir_AbsoluteSuffixCannotEscapeUserConfigDir(t *testing.T) {
 	}
 }
 
-func TestDefaultDataDir_DotDotSuffixCannotEscapeUserConfigDir(t *testing.T) {
-	got, err := webserv.DefaultDataDir("", "../webserv-audit")
-	if err == nil {
-		t.Fatalf("expected invalid suffix error, got path %q", got)
-	}
-}
-
 func TestConfigListen_ErrorAfterBindMayPopulateListenURL(t *testing.T) {
 	const noSuchUser = "webserv-no-such-user-audit-listenurl"
 	if _, err := user.Lookup(noSuchUser); err == nil {

@@ -137,3 +137,17 @@ func TestNew(t *testing.T) {
 		}
 	})
 }
+
+func TestListener_MalformedBracketHostRejected(t *testing.T) {
+	for _, listenAddr := range []string{"[]", "[]:0", "[]:"} {
+		l, _, _, err := webserv.Listener(listenAddr, "", "", "", "")
+		addr := "<nil>"
+		if l != nil {
+			addr = l.Addr().String()
+			_ = l.Close()
+		}
+		if err == nil {
+			t.Fatalf("expected malformed listen address %q to fail, got listener on %q", listenAddr, addr)
+		}
+	}
+}

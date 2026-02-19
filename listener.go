@@ -28,17 +28,22 @@ const (
 func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) {
 	var cert *tls.Certificate
 	if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil {
+		var bindAddr string
 		var schemesuffix string
 		if cert != nil {
 			schemesuffix = "s"
-			l, err = tls.Listen("tcp", defaultAddress(listenAddr, "443", "8443"),
-				&tls.Config{
-					Certificates: []tls.Certificate{*cert},
-					MinVersion:   tls.VersionTLS13,
-				},
-			)
+			if bindAddr, err = normalizeListenAddr(listenAddr, "443", "8443"); err == nil {
+				l, err = tls.Listen("tcp", bindAddr,
+					&tls.Config{
+						Certificates: []tls.Certificate{*cert},
+						MinVersion:   tls.VersionTLS13,
+					},
+				)
+			}
 		} else {
-			l, err = net.Listen("tcp", defaultAddress(listenAddr, "80", "8080"))
+			if bindAddr, err = normalizeListenAddr(listenAddr, "80", "8080"); err == nil {
+				l, err = net.Listen("tcp", bindAddr)
+			}
 		}
 		if l != nil {
 			if listenUrl = overrideUrl; listenUrl == "" {
@@ -49,18 +54,33 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 	return
 }
 
-func defaultAddress(address, defaultpriv, defaultother string) (result string) {
-	result = address
-	if _, _, err := net.SplitHostPort(address); err != nil {
-		defaultPort := defaultpriv
-		if os.Geteuid() > 0 {
-			defaultPort = defaultother
+func normalizeListenAddr(address, defaultpriv, defaultother string) (result string, err error) {
+	if _, _, err = net.SplitHostPort(address); err == nil {
+		// host and port both present
+		if strings.HasPrefix(address, "[]") {
+			err = net.InvalidAddrError(address)
+		} else {
+			result = address
 		}
-		if len(address) > 2 && strings.HasPrefix(address, "[") && strings.HasSuffix(address, "]") {
-			address = address[1 : len(address)-1]
-		}
-		result = net.JoinHostPort(address, defaultPort)
+		return
 	}
+
+	err = nil
+	defaultPort := defaultpriv
+	if os.Geteuid() > 0 {
+		defaultPort = defaultother
+	}
+
+	result = address
+	if strings.HasPrefix(address, "[") {
+		if len(address) > 2 && strings.HasSuffix(address, "]") {
+			result = address[1 : len(address)-1]
+		} else {
+			result = ""
+			err = net.InvalidAddrError(address)
+		}
+	}
+	result = net.JoinHostPort(result, defaultPort)
 	return
 }
 
