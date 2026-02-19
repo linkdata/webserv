@@ -3,26 +3,27 @@ package webserv
 import (
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 )
 
-// DefaultDataDir returns dataDir if not empty, otherwise if
-// defaultSuffix is not empty it returns the joined path
+// DefaultDataDir returns the absolute path to dataDir if not empty, otherwise if
+// defaultSuffix is not empty it returns the absolute joined path
 // of os.UserConfigDir() and defaultSuffix.
 //
 // dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
 // They are not confined to UserConfigDir, so they may resolve outside of it.
 // Caller is responsible for validating or sandboxing untrusted path input.
-func DefaultDataDir(dataDir, defaultSuffix string) (string, error) {
-	var err error
+func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) {
+	result = dataDir
 	if dataDir == "" && defaultSuffix != "" {
-		dataDir, err = os.UserConfigDir()
+		result, err = os.UserConfigDir()
 		if err == nil {
 			defaultSuffix = os.ExpandEnv(defaultSuffix)
-			dataDir = filepath.Join(dataDir, defaultSuffix)
 		}
 	}
-	return dataDir, err
+	result, err = filepath.Abs(path.Join(result, defaultSuffix))
+	return
 }
 
 // UseDataDir expands environment variables in dataDir and transforms

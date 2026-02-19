@@ -2,6 +2,7 @@ package webserv_test
 
 import (
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,7 +23,8 @@ func TestDefaultDataDir(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if got != "foo" {
+	want, _ := filepath.Abs(path.Join("foo", "suffix"))
+	if got != want {
 		t.Error(got)
 	}
 }

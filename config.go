@@ -67,7 +67,10 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 				}
 			}
 		}
-		if err != nil {
+	}
+	if err != nil {
+		cfg.DataDir = ""
+		if l != nil {
 			_ = l.Close()
 			l = nil
 		}
