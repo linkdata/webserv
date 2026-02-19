@@ -30,14 +30,14 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 		var schemesuffix string
 		if cert != nil {
 			schemesuffix = "s"
-			l, err = tls.Listen("tcp", defaultAddress(listenAddr, ":443", ":8443"),
+			l, err = tls.Listen("tcp", defaultAddress(listenAddr, "443", "8443"),
 				&tls.Config{
 					Certificates: []tls.Certificate{*cert},
 					MinVersion:   tls.VersionTLS13,
 				},
 			)
 		} else {
-			l, err = net.Listen("tcp", defaultAddress(listenAddr, ":80", ":8080"))
+			l, err = net.Listen("tcp", defaultAddress(listenAddr, "80", "8080"))
 		}
 		if l != nil {
 			if listenUrl = overrideUrl; listenUrl == "" {
@@ -48,14 +48,16 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 	return
 }
 
-func defaultAddress(address, defaultpriv, defaultother string) string {
-	if address == "" {
-		address = defaultpriv
+func defaultAddress(address, defaultpriv, defaultother string) (result string) {
+	result = address
+	if _, _, err := net.SplitHostPort(address); err != nil {
+		defaultPort := defaultpriv
 		if os.Geteuid() > 0 {
-			address = defaultother
+			defaultPort = defaultother
 		}
+		result = net.JoinHostPort(address, defaultPort)
 	}
-	return address
+	return
 }
 
 func localhostOrDNSName(cert *tls.Certificate) string {

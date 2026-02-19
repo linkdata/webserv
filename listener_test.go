@@ -119,7 +119,7 @@ func TestNew(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				gotListener, gotUrl, gotCertDir, err := webserv.Listener(tt.args.wantAddress, tt.args.certDir, "", "", "")
 				if (err != nil) != tt.wantErr {
-					t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("Listener() %q error = %v, wantErr %v", tt.args.wantAddress, err, tt.wantErr)
 					return
 				}
 				if gotListener != nil {
