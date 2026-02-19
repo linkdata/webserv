@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+var ShutdownTimeLimit = time.Second
+
 type Config struct {
 	Address              string      // optional specific address (and/or port) to listen on
 	CertDir              string      // if set, directory to look for fullchain.pem and privkey.pem
@@ -98,7 +100,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 			}
 		}
 		cfg.logInfo("stopped", "reason", reason)
-		shutdownCtx, shutdownCancel := context.WithTimeout(ctx, time.Second)
+		shutdownCtx, shutdownCancel := context.WithTimeout(ctx, ShutdownTimeLimit)
 		shutdownErr := srv.Shutdown(shutdownCtx)
 		shutdownCancel()
 		serveExitErr := <-serveErr
