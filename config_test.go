@@ -6,8 +6,8 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"runtime"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -15,6 +15,9 @@ import (
 )
 
 func TestConfig_ListenAndServe_Signalled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Interrupt signalling from tests is not reliable on windows")
+	}
 	withCertFiles(t, func(destdir string) {
 		homeDir := os.Getenv("HOME")
 		if st, err := os.Stat(homeDir); err != nil || !st.IsDir() {
@@ -31,14 +34,10 @@ func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 		go func() {
-			waited := 0
-			for cfg.BreakChan() == nil {
-				if waited > 500 {
-					t.Error("timeout waiting for server to start")
-					return
-				}
+			time.Sleep(50 * time.Millisecond)
+			if p, err := os.FindProcess(os.Getpid()); err == nil {
+				_ = p.Signal(os.Interrupt)
 			}
-			cfg.BreakChan() <- syscall.SIGUSR1
 		}()
 		err := cfg.ListenAndServe(ctx, nil)
 		if err != nil {
@@ -68,14 +67,8 @@ func TestConfig_ListenAndServe_Cancelled(t *testing.T) {
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
-			defer cancel()
-			waited := 0
-			for cfg.BreakChan() == nil {
-				if waited > 500 {
-					t.Error("timeout waiting for server to start")
-					return
-				}
-			}
+			time.Sleep(50 * time.Millisecond)
+			cancel()
 		}()
 		err := cfg.ListenAndServe(ctx, nil)
 		if !errors.Is(err, context.Canceled) {
