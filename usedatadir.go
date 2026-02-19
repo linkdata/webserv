@@ -1,10 +1,11 @@
 package webserv
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
+	"strings"
 )
 
 // DefaultDataDir returns dataDir if not empty, otherwise if
@@ -15,7 +16,13 @@ func DefaultDataDir(dataDir, defaultSuffix string) (string, error) {
 	if dataDir == "" && defaultSuffix != "" {
 		dataDir, err = os.UserConfigDir()
 		if err == nil {
-			dataDir = path.Join(dataDir, defaultSuffix)
+			baseDir := filepath.Clean(dataDir)
+			candidate := filepath.Clean(filepath.Join(baseDir, defaultSuffix))
+			rel, relErr := filepath.Rel(baseDir, candidate)
+			if relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+				return "", fmt.Errorf("invalid DefaultDataDir suffix %q", defaultSuffix)
+			}
+			dataDir = candidate
 		}
 	}
 	return dataDir, err
