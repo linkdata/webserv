@@ -129,33 +129,24 @@ import (
         "net/http"
         "os"
         "os/signal"
-        "sync"
         "syscall"
         "time"
 )
 
-type Config struct {
-        Address              string         // optional specific address (and/or port) to listen on
-        CertDir              string         // if set, directory to look for fullchain.pem and privkey.pem
-        FullchainPem         string         // set to override filename for "fullchain.pem"
-        PrivkeyPem           string         // set to override filename for "privkey.pem"
-        User                 string         // if set, user to switch to after opening listening port
-        DataDir              string         // if set, create this directory, if unset will be filled in after Listen
-        DefaultDataDirSuffix string         // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
-        DataDirMode          fs.FileMode    // if nonzero, create DataDir if it does not exist using this mode
-        ListenURL            string         // if set, the external URL clients can reach us at, if unset will be filled in after Listen (e.g. "https://localhost:8443")
-        Logger               Logger         // logger to use, if nil logs nothing
-        mu                   sync.Mutex     // protects following
-        breakChan            chan os.Signal // break channel
-}
+var ShutdownTimeLimit = time.Second
 
-// BreakChan returns the break signalling channel, or nil if not yet started serving requests.
-func (cfg *Config) BreakChan() (ch chan&lt;- os.Signal) <span class="cov8" title="1">{
-        cfg.mu.Lock()
-        ch = cfg.breakChan
-        cfg.mu.Unlock()
-        return
-}</span>
+type Config struct {
+        Address              string      // optional specific address (and/or port) to listen on
+        CertDir              string      // if set, directory to look for fullchain.pem and privkey.pem
+        FullchainPem         string      // set to override filename for "fullchain.pem"
+        PrivkeyPem           string      // set to override filename for "privkey.pem"
+        User                 string      // if set, user to switch to after opening listening port
+        DataDir              string      // if set, create this directory, if unset will be filled in after Listen
+        DefaultDataDirSuffix string      // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
+        DataDirMode          fs.FileMode // if nonzero, create DataDir if it does not exist using this mode
+        ListenURL            string      // if set, the external URL clients can reach us at. If unset, Listen may fill this in (e.g. "https://localhost:8443"), even when Listen later returns an error after binding.
+        Logger               Logger      // logger to use, if nil logs nothing
+}
 
 func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov8" title="1">{
         if cfg.Logger != nil &amp;&amp; len(keyValuePairs) &gt; 1 </span><span class="cov8" title="1">{
@@ -182,9 +173,11 @@ func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov8" 
 // data directory path and sets cfg.DataDir. If cfg.DataDirMode is nonzero, the
 // directory will be created if necessary.
 //
-// On a non-error return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty,
-// and if cfg.ListenURL was empty it will be set to a best-guess printable and connectable
-// URL like "http://localhost:80".
+// On return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
+// If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
+// URL like "http://localhost:80" as soon as the socket is opened.
+// Therefore cfg.ListenURL can be non-empty even if Listen returns an error from a
+// later step, such as user switching or data directory setup.
 func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov8" title="1">{
         if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL); err == nil </span><span class="cov8" title="1">{
                 cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
@@ -205,41 +198,46 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov8" title
 }
 
 // ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls srv.Serve(l).
+// If ctx is canceled, the server will be shut down and this function returns with ctx.Err().
 //
-// If the context is cancelled or a signal is received, calls srv.Shutdown(ctx).
 // Returns nil if the server started successfully and then cleanly shut down.
-func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) error <span class="cov8" title="1">{
-        breakChan := make(chan os.Signal, 1)
-        signal.Notify(breakChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+//
+// Panics if any of the arguments are nil.
+func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov8" title="1">{
+        serveErr := make(chan error, 1)
+        sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+        defer stop()
         cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
         go func() </span><span class="cov8" title="1">{
-                cfg.mu.Lock()
-                cfg.breakChan = breakChan
-                cfg.mu.Unlock()
-                select </span>{
-                case sig, ok := &lt;-breakChan:<span class="cov8" title="1">
-                        if ok </span><span class="cov8" title="1">{
-                                defer close(breakChan)
-                                cfg.logInfo("received signal", "sig", sig.String())
+                serveErr &lt;- srv.Serve(l)
+        }</span>()
+        <span class="cov8" title="1">select </span>{
+        case err = &lt;-serveErr:<span class="cov8" title="1"></span>
+        case &lt;-sigCtx.Done():<span class="cov8" title="1">
+                reason := "interrupted"
+                if err = ctx.Err(); err != nil </span><span class="cov8" title="1">{
+                        reason = err.Error()
+                }</span> else<span class="cov8" title="1"> {
+                        if cause := context.Cause(sigCtx); cause != nil </span><span class="cov8" title="1">{
+                                reason = cause.Error()
                         }</span>
-                case &lt;-ctx.Done():<span class="cov8" title="1">
-                        defer close(breakChan)
-                        cfg.logInfo("context done", "err", context.Cause(ctx))</span>
                 }
-                <span class="cov8" title="1">signal.Stop(breakChan)
-                _ = srv.Shutdown(ctx)</span>
-        }()
-        <span class="cov8" title="1">err := srv.Serve(l)
-        for err == http.ErrServerClosed </span><span class="cov8" title="1">{
-                select </span>{
-                case _, ok := &lt;-breakChan:<span class="cov8" title="1">
-                        if !ok </span><span class="cov8" title="1">{
-                                err = nil
+                <span class="cov8" title="1">cfg.logInfo("stopped", "reason", reason)
+                shutdownCtx, shutdownCancel := context.WithTimeout(ctx, ShutdownTimeLimit)
+                shutdownErr := srv.Shutdown(shutdownCtx)
+                shutdownCancel()
+                serveExitErr := &lt;-serveErr
+                if err == nil </span><span class="cov8" title="1">{
+                        if shutdownErr != nil </span><span class="cov8" title="1">{
+                                err = shutdownErr
+                        }</span> else<span class="cov8" title="1"> {
+                                err = serveExitErr
                         }</span>
-                case &lt;-ctx.Done():<span class="cov8" title="1">
-                        return context.Cause(ctx)</span>
                 }
         }
+        <span class="cov8" title="1">if err == http.ErrServerClosed </span><span class="cov8" title="1">{
+                err = nil
+        }</span>
         <span class="cov8" title="1">return err</span>
 }
 
@@ -303,6 +301,7 @@ import (
         "fmt"
         "net"
         "os"
+        "strings"
 )
 
 const (
@@ -325,18 +324,23 @@ const (
 func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) <span class="cov8" title="1">{
         var cert *tls.Certificate
         if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil </span><span class="cov8" title="1">{
+                var bindAddr string
                 var schemesuffix string
                 if cert != nil </span><span class="cov8" title="1">{
                         schemesuffix = "s"
-                        l, err = tls.Listen("tcp", defaultAddress(listenAddr, "443", "8443"),
-                                &amp;tls.Config{
-                                        Certificates: []tls.Certificate{*cert},
-                                        MinVersion:   tls.VersionTLS13,
-                                },
-                        )
-                }</span> else<span class="cov8" title="1"> {
-                        l, err = net.Listen("tcp", defaultAddress(listenAddr, "80", "8080"))
-                }</span>
+                        if bindAddr, err = normalizeListenAddr(listenAddr, "443", "8443"); err == nil </span><span class="cov8" title="1">{
+                                l, err = tls.Listen("tcp", bindAddr,
+                                        &amp;tls.Config{
+                                                Certificates: []tls.Certificate{*cert},
+                                                MinVersion:   tls.VersionTLS13,
+                                        },
+                                )
+                        }</span>
+                } else<span class="cov8" title="1"> {
+                        if bindAddr, err = normalizeListenAddr(listenAddr, "80", "8080"); err == nil </span><span class="cov8" title="1">{
+                                l, err = net.Listen("tcp", bindAddr)
+                        }</span>
+                }
                 <span class="cov8" title="1">if l != nil </span><span class="cov8" title="1">{
                         if listenUrl = overrideUrl; listenUrl == "" </span><span class="cov8" title="1">{
                                 listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenUrlString(l, cert))
@@ -346,16 +350,34 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
         <span class="cov8" title="1">return</span>
 }
 
-func defaultAddress(address, defaultpriv, defaultother string) (result string) <span class="cov8" title="1">{
-        result = address
-        if _, _, err := net.SplitHostPort(address); err != nil </span><span class="cov8" title="1">{
-                defaultPort := defaultpriv
-                if os.Geteuid() &gt; 0 </span><span class="cov8" title="1">{
-                        defaultPort = defaultother
+func normalizeListenAddr(address, defaultpriv, defaultother string) (result string, err error) <span class="cov8" title="1">{
+        if _, _, err = net.SplitHostPort(address); err == nil </span><span class="cov8" title="1">{
+                // host and port both present
+                if strings.HasPrefix(address, "[]") </span><span class="cov8" title="1">{
+                        err = net.InvalidAddrError(address)
+                }</span> else<span class="cov8" title="1"> {
+                        result = address
                 }</span>
-                <span class="cov8" title="1">result = net.JoinHostPort(address, defaultPort)</span>
+                <span class="cov8" title="1">return</span>
         }
-        <span class="cov8" title="1">return</span>
+
+        <span class="cov8" title="1">err = nil
+        defaultPort := defaultpriv
+        if os.Geteuid() &gt; 0 </span><span class="cov8" title="1">{
+                defaultPort = defaultother
+        }</span>
+
+        <span class="cov8" title="1">result = address
+        if strings.HasPrefix(address, "[") </span><span class="cov8" title="1">{
+                if len(address) &gt; 2 &amp;&amp; strings.HasSuffix(address, "]") </span><span class="cov8" title="1">{
+                        result = address[1 : len(address)-1]
+                }</span> else<span class="cov8" title="1"> {
+                        result = ""
+                        err = net.InvalidAddrError(address)
+                }</span>
+        }
+        <span class="cov8" title="1">result = net.JoinHostPort(result, defaultPort)
+        return</span>
 }
 
 func localhostOrDNSName(cert *tls.Certificate) string <span class="cov8" title="1">{
@@ -396,6 +418,10 @@ import (
 // It then tries to load a X509 key pair from the files named fullchainPem
 // and privkeyPem from the resulting directory.
 //
+// The filenames may contain paths, ".." segments and symlinks.
+// They are not confined to certDir, so they may resolve outside of it.
+// Caller is responsible for validating or sandboxing untrusted path input.
+//
 // If fullchainPem is empty, it defaults to "fullchain.pem".
 // If privkeyPem is empty, it defaults to "privkey.pem".
 //
@@ -427,19 +453,23 @@ func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, 
 import (
         "io/fs"
         "os"
-        "path"
         "path/filepath"
 )
 
 // DefaultDataDir returns dataDir if not empty, otherwise if
 // defaultSuffix is not empty it returns the joined path
 // of os.UserConfigDir() and defaultSuffix.
+//
+// dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
+// They are not confined to UserConfigDir, so they may resolve outside of it.
+// Caller is responsible for validating or sandboxing untrusted path input.
 func DefaultDataDir(dataDir, defaultSuffix string) (string, error) <span class="cov8" title="1">{
         var err error
         if dataDir == "" &amp;&amp; defaultSuffix != "" </span><span class="cov8" title="1">{
                 dataDir, err = os.UserConfigDir()
                 if err == nil </span><span class="cov8" title="1">{
-                        dataDir = path.Join(dataDir, defaultSuffix)
+                        defaultSuffix = os.ExpandEnv(defaultSuffix)
+                        dataDir = filepath.Join(dataDir, defaultSuffix)
                 }</span>
         }
         <span class="cov8" title="1">return dataDir, err</span>
