@@ -76,7 +76,7 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 // If the context is cancelled or a signal is received, calls srv.Shutdown(ctx).
 // Returns nil if the server started successfully and then cleanly shut down.
 //
-// Panics if l is nil.
+// Panics if any of the arguments are nil.
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) {
 	serveErr := make(chan error, 1)
 	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
