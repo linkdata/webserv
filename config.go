@@ -95,8 +95,15 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 			}
 		}
 		cfg.logInfo("stopped", "reason", reason)
-		_ = srv.Shutdown(ctx)
-		<-serveErr
+		shutdownErr := srv.Shutdown(ctx)
+		serveExitErr := <-serveErr
+		if err == nil {
+			if shutdownErr != nil {
+				err = shutdownErr
+			} else {
+				err = serveExitErr
+			}
+		}
 	}
 	if err == http.ErrServerClosed {
 		err = nil
