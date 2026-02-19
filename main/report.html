@@ -196,6 +196,10 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov8" title
                                 }</span>
                         }
                 }
+                <span class="cov8" title="1">if err != nil </span><span class="cov8" title="1">{
+                        _ = l.Close()
+                        l = nil
+                }</span>
         }
         <span class="cov8" title="1">return</span>
 }
@@ -324,14 +328,14 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
                 var schemesuffix string
                 if cert != nil </span><span class="cov8" title="1">{
                         schemesuffix = "s"
-                        l, err = tls.Listen("tcp", defaultAddress(listenAddr, ":443", ":8443"),
+                        l, err = tls.Listen("tcp", defaultAddress(listenAddr, "443", "8443"),
                                 &amp;tls.Config{
                                         Certificates: []tls.Certificate{*cert},
                                         MinVersion:   tls.VersionTLS13,
                                 },
                         )
                 }</span> else<span class="cov8" title="1"> {
-                        l, err = net.Listen("tcp", defaultAddress(listenAddr, ":80", ":8080"))
+                        l, err = net.Listen("tcp", defaultAddress(listenAddr, "80", "8080"))
                 }</span>
                 <span class="cov8" title="1">if l != nil </span><span class="cov8" title="1">{
                         if listenUrl = overrideUrl; listenUrl == "" </span><span class="cov8" title="1">{
@@ -342,14 +346,16 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
         <span class="cov8" title="1">return</span>
 }
 
-func defaultAddress(address, defaultpriv, defaultother string) string <span class="cov8" title="1">{
-        if address == "" </span><span class="cov8" title="1">{
-                address = defaultpriv
+func defaultAddress(address, defaultpriv, defaultother string) (result string) <span class="cov8" title="1">{
+        result = address
+        if _, _, err := net.SplitHostPort(address); err != nil </span><span class="cov8" title="1">{
+                defaultPort := defaultpriv
                 if os.Geteuid() &gt; 0 </span><span class="cov8" title="1">{
-                        address = defaultother
+                        defaultPort = defaultother
                 }</span>
+                <span class="cov8" title="1">result = net.JoinHostPort(address, defaultPort)</span>
         }
-        <span class="cov8" title="1">return address</span>
+        <span class="cov8" title="1">return</span>
 }
 
 func localhostOrDNSName(cert *tls.Certificate) string <span class="cov8" title="1">{
