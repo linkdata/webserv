@@ -207,6 +207,16 @@ func TestGroupIDsFn_DefaultImplementation(t *testing.T) {
 	}
 }
 
+func TestParseGroupIDs_ErrorBeforeValidEntryIsNotSilentlyDropped(t *testing.T) {
+	// Bug: parseGroupIDs continues the loop after a parse error, so a
+	// subsequent successful parse overwrites err with nil.
+	// e.g. ["bad", "201"] should return an error, not ([201], nil).
+	gids, err := parseGroupIDs([]string{"bad", "201"})
+	if err == nil {
+		t.Fatalf("expected error for invalid group ID, got gids=%v", gids)
+	}
+}
+
 func TestBecomeUser_RootWithoutSupplementaryGroupsFallsBackToPrimaryGroup(t *testing.T) {
 	saved := captureBecomeUserFns()
 	defer restoreBecomeUserFns(saved)

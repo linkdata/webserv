@@ -22,9 +22,9 @@ var (
 
 func parseGroupIDs(groupIDs []string) (gids []int, err error) {
 	gids = make([]int, 0, len(groupIDs))
-	for _, groupID := range groupIDs {
+	for i := 0; i < len(groupIDs) && err == nil; i++ {
 		var gid int
-		if gid, err = strconv.Atoi(groupID); err == nil {
+		if gid, err = strconv.Atoi(groupIDs[i]); err == nil {
 			gids = append(gids, gid)
 		}
 	}
