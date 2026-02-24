@@ -3,13 +3,15 @@ package webserv
 import (
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 )
 
 // DefaultDataDir returns the absolute path to dataDir if not empty, otherwise if
 // defaultSuffix is not empty it returns the absolute joined path
 // of os.UserConfigDir() and defaultSuffix.
+//
+// It will expand environment variables in the path before evaluating the
+// absolute path.
 //
 // dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
 // They are not confined to UserConfigDir, so they may resolve outside of it.
@@ -19,7 +21,7 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) {
 	if result == "" {
 		if defaultSuffix != "" {
 			if result, err = os.UserConfigDir(); err == nil {
-				result = path.Join(result, defaultSuffix)
+				result = filepath.Join(result, defaultSuffix)
 			}
 		}
 	}
@@ -30,15 +32,14 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) {
 	return
 }
 
-// UseDataDir expands environment variables in dataDir and transforms
-// it into an absolute path. Then, if mode is not zero, it creates
-// the path if it does not exist. Does nothing if dataDir is empty.
+// UseDataDir transforms dataDir into an absolute path. Then, if mode
+// is not zero, it creates the path if it does not exist. Does nothing
+// if dataDir is empty. Does not expand environment variables in the path.
 //
 // Returns the final path or an empty string if dataDir was empty.
 func UseDataDir(dataDir string, mode fs.FileMode) (string, error) {
 	var err error
 	if dataDir != "" {
-		dataDir = os.ExpandEnv(dataDir)
 		if dataDir, err = filepath.Abs(dataDir); err == nil {
 			if mode != 0 {
 				err = os.MkdirAll(dataDir, mode)

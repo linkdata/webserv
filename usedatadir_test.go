@@ -47,6 +47,26 @@ func TestUseDataDir(t *testing.T) {
 	}
 }
 
+func TestUseDataDir_DoesNotDoubleExpandEnv(t *testing.T) {
+	// Bug: DefaultDataDir already calls os.ExpandEnv, then UseDataDir
+	// calls os.ExpandEnv again. If the path contains a literal '$' after
+	// the first expansion, the second expansion misinterprets it.
+	dir := t.TempDir()
+	// UseDataDir should not expand an already-absolute path further.
+	// A literal "$" in the path should survive unchanged.
+	literalDollar := filepath.Join(dir, "$NOTAVAR")
+	if err := os.MkdirAll(literalDollar, 0750); err != nil {
+		t.Fatal(err)
+	}
+	got, err := webserv.UseDataDir(literalDollar, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != literalDollar {
+		t.Fatalf("UseDataDir expanded literal $: got %q, want %q", got, literalDollar)
+	}
+}
+
 func TestDefaultDataDir_AbsoluteSuffixCannotEscapeUserConfigDir(t *testing.T) {
 	base, err := os.UserConfigDir()
 	if err != nil {
