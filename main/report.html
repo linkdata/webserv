@@ -185,11 +185,14 @@ type Config struct {
 }
 
 func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov8" title="1">{
-        if cfg.Logger != nil &amp;&amp; len(keyValuePairs) &gt; 1 </span><span class="cov8" title="1">{
-                s, ok := keyValuePairs[1].(string)
-                if !ok || s != "" </span><span class="cov8" title="1">{
-                        cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
-                }</span>
+        if cfg.Logger != nil </span><span class="cov8" title="1">{
+                if len(keyValuePairs) &gt; 1 </span><span class="cov8" title="1">{
+                        if s, ok := keyValuePairs[1].(string); ok &amp;&amp; s == "" </span><span class="cov8" title="1">{
+                                // suppress info msgs with a first blank string value
+                                return
+                        }</span>
+                }
+                <span class="cov8" title="1">cfg.Logger.Info("webserv: "+msg, keyValuePairs...)</span>
         }
 }
 
@@ -262,7 +265,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
                         }</span>
                 }
                 <span class="cov8" title="1">cfg.logInfo("stopped", "reason", reason)
-                shutdownCtx, shutdownCancel := context.WithTimeout(ctx, ShutdownTimeLimit)
+                shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), ShutdownTimeLimit)
                 shutdownErr := srv.Shutdown(shutdownCtx)
                 shutdownCancel()
                 serveExitErr := &lt;-serveErr
