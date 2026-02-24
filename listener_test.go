@@ -3,7 +3,7 @@ package webserv_test
 import (
 	"net"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/linkdata/webserv"
@@ -34,8 +34,8 @@ EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
 				t.Error(err)
 			}
 		}()
-		if err = os.WriteFile(path.Join(destdir, webserv.FullchainPem), certPem, 0640); err == nil {
-			if err = os.WriteFile(path.Join(destdir, webserv.PrivkeyPem), keyPem, 0640); err == nil {
+		if err = os.WriteFile(filepath.Join(destdir, webserv.FullchainPem), certPem, 0640); err == nil {
+			if err = os.WriteFile(filepath.Join(destdir, webserv.PrivkeyPem), keyPem, 0640); err == nil {
 				fn(destdir)
 			}
 		}
