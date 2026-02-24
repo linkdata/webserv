@@ -103,9 +103,9 @@ var (
 
 func parseGroupIDs(groupIDs []string) (gids []int, err error) <span class="cov8" title="1">{
         gids = make([]int, 0, len(groupIDs))
-        for _, groupID := range groupIDs </span><span class="cov8" title="1">{
+        for i := 0; i &lt; len(groupIDs) &amp;&amp; err == nil; i++ </span><span class="cov8" title="1">{
                 var gid int
-                if gid, err = strconv.Atoi(groupID); err == nil </span><span class="cov8" title="1">{
+                if gid, err = strconv.Atoi(groupIDs[i]); err == nil </span><span class="cov8" title="1">{
                         gids = append(gids, gid)
                 }</span>
         }
@@ -448,7 +448,6 @@ func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) <span 
 import (
         "crypto/tls"
         "os"
-        "path"
         "path/filepath"
 )
 
@@ -476,8 +475,8 @@ func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, 
                         <span class="cov8" title="1">if privkeyPem == "" </span><span class="cov8" title="1">{
                                 privkeyPem = PrivkeyPem
                         }</span>
-                        <span class="cov8" title="1">fc := path.Join(absCertDir, fullchainPem)
-                        pk := path.Join(absCertDir, privkeyPem)
+                        <span class="cov8" title="1">fc := filepath.Join(absCertDir, fullchainPem)
+                        pk := filepath.Join(absCertDir, privkeyPem)
                         if cer, err = tls.LoadX509KeyPair(fc, pk); err == nil </span><span class="cov8" title="1">{
                                 cert = &amp;cer
                         }</span>
@@ -492,13 +491,15 @@ func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, 
 import (
         "io/fs"
         "os"
-        "path"
         "path/filepath"
 )
 
 // DefaultDataDir returns the absolute path to dataDir if not empty, otherwise if
 // defaultSuffix is not empty it returns the absolute joined path
 // of os.UserConfigDir() and defaultSuffix.
+//
+// It will expand environment variables in the path before evaluating the
+// absolute path.
 //
 // dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
 // They are not confined to UserConfigDir, so they may resolve outside of it.
@@ -508,7 +509,7 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <s
         if result == "" </span><span class="cov8" title="1">{
                 if defaultSuffix != "" </span><span class="cov8" title="1">{
                         if result, err = os.UserConfigDir(); err == nil </span><span class="cov8" title="1">{
-                                result = path.Join(result, defaultSuffix)
+                                result = filepath.Join(result, defaultSuffix)
                         }</span>
                 }
         }
@@ -519,15 +520,14 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <s
         <span class="cov8" title="1">return</span>
 }
 
-// UseDataDir expands environment variables in dataDir and transforms
-// it into an absolute path. Then, if mode is not zero, it creates
-// the path if it does not exist. Does nothing if dataDir is empty.
+// UseDataDir transforms dataDir into an absolute path. Then, if mode
+// is not zero, it creates the path if it does not exist. Does nothing
+// if dataDir is empty. Does not expand environment variables in the path.
 //
 // Returns the final path or an empty string if dataDir was empty.
 func UseDataDir(dataDir string, mode fs.FileMode) (string, error) <span class="cov8" title="1">{
         var err error
         if dataDir != "" </span><span class="cov8" title="1">{
-                dataDir = os.ExpandEnv(dataDir)
                 if dataDir, err = filepath.Abs(dataDir); err == nil </span><span class="cov8" title="1">{
                         if mode != 0 </span><span class="cov8" title="1">{
                                 err = os.MkdirAll(dataDir, mode)
