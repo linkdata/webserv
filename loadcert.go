@@ -3,7 +3,6 @@ package webserv
 import (
 	"crypto/tls"
 	"os"
-	"path"
 	"path/filepath"
 )
 
@@ -31,8 +30,8 @@ func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, 
 			if privkeyPem == "" {
 				privkeyPem = PrivkeyPem
 			}
-			fc := path.Join(absCertDir, fullchainPem)
-			pk := path.Join(absCertDir, privkeyPem)
+			fc := filepath.Join(absCertDir, fullchainPem)
+			pk := filepath.Join(absCertDir, privkeyPem)
 			if cer, err = tls.LoadX509KeyPair(fc, pk); err == nil {
 				cert = &cer
 			}
