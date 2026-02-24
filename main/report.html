@@ -418,8 +418,10 @@ func normalizeListenAddr(address, defaultpriv, defaultother string) (result stri
                         err = net.InvalidAddrError(address)
                 }</span>
         }
-        <span class="cov8" title="1">result = net.JoinHostPort(result, defaultPort)
-        return</span>
+        <span class="cov8" title="1">if err == nil </span><span class="cov8" title="1">{
+                result = net.JoinHostPort(result, defaultPort)
+        }</span>
+        <span class="cov8" title="1">return</span>
 }
 
 func localhostOrDNSName(cert *tls.Certificate) string <span class="cov8" title="1">{
