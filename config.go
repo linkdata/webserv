@@ -27,11 +27,14 @@ type Config struct {
 }
 
 func (cfg *Config) logInfo(msg string, keyValuePairs ...any) {
-	if cfg.Logger != nil && len(keyValuePairs) > 1 {
-		s, ok := keyValuePairs[1].(string)
-		if !ok || s != "" {
-			cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
+	if cfg.Logger != nil {
+		if len(keyValuePairs) > 1 {
+			if s, ok := keyValuePairs[1].(string); ok && s == "" {
+				// suppress info msgs with a first blank string value
+				return
+			}
 		}
+		cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
 	}
 }
 
@@ -104,7 +107,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 			}
 		}
 		cfg.logInfo("stopped", "reason", reason)
-		shutdownCtx, shutdownCancel := context.WithTimeout(ctx, ShutdownTimeLimit)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), ShutdownTimeLimit)
 		shutdownErr := srv.Shutdown(shutdownCtx)
 		shutdownCancel()
 		serveExitErr := <-serveErr

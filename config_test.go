@@ -345,6 +345,8 @@ func TestConfigServeWith_SignalShutdownCanHangWithoutDeadline(t *testing.T) {
 	}
 	defer func() { _ = srv.Close() }()
 
+	savedTimeLimit := webserv.ShutdownTimeLimit
+	defer func() { webserv.ShutdownTimeLimit = savedTimeLimit }()
 	webserv.ShutdownTimeLimit = time.Millisecond * 10
 
 	done := make(chan error, 1)
