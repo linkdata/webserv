@@ -49,3 +49,18 @@ func TestNormalizeListenAddr_MalformedBracketHostRejected(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeListenAddr_MalformedBracketResultIsEmpty(t *testing.T) {
+	// Bug: normalizeListenAddr falls through to net.JoinHostPort on the
+	// bracket-validation error path, returning a non-empty result (e.g. ":8080")
+	// alongside the error.
+	for _, in := range []string{"[]", "[::1"} {
+		got, err := normalizeListenAddr(in, "80", "8080")
+		if err == nil {
+			t.Fatalf("normalizeListenAddr(%q) = (%q, nil), want error", in, got)
+		}
+		if got != "" {
+			t.Fatalf("normalizeListenAddr(%q) result = %q on error, want empty string", in, got)
+		}
+	}
+}

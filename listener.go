@@ -80,7 +80,9 @@ func normalizeListenAddr(address, defaultpriv, defaultother string) (result stri
 			err = net.InvalidAddrError(address)
 		}
 	}
-	result = net.JoinHostPort(result, defaultPort)
+	if err == nil {
+		result = net.JoinHostPort(result, defaultPort)
+	}
 	return
 }
 
