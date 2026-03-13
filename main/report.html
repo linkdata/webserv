@@ -256,14 +256,11 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
         <span class="cov8" title="1">select </span>{
         case err = &lt;-serveErr:<span class="cov8" title="1"></span>
         case &lt;-sigCtx.Done():<span class="cov8" title="1">
-                reason := "interrupted"
-                if err = ctx.Err(); err != nil </span><span class="cov8" title="1">{
-                        reason = err.Error()
-                }</span> else<span class="cov8" title="1"> {
-                        if cause := context.Cause(sigCtx); cause != nil </span><span class="cov8" title="1">{
-                                reason = cause.Error()
-                        }</span>
-                }
+                err = ctx.Err()
+                var reason error
+                if reason = context.Cause(ctx); reason == nil </span><span class="cov8" title="1">{
+                        reason = context.Cause(sigCtx)
+                }</span>
                 <span class="cov8" title="1">cfg.logInfo("stopped", "reason", reason)
                 shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), ShutdownTimeLimit)
                 shutdownErr := srv.Shutdown(shutdownCtx)
