@@ -98,13 +98,10 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 	select {
 	case err = <-serveErr:
 	case <-sigCtx.Done():
-		reason := "interrupted"
-		if err = ctx.Err(); err != nil {
-			reason = err.Error()
-		} else {
-			if cause := context.Cause(sigCtx); cause != nil {
-				reason = cause.Error()
-			}
+		err = ctx.Err()
+		var reason error
+		if reason = context.Cause(ctx); reason == nil {
+			reason = context.Cause(sigCtx)
 		}
 		cfg.logInfo("stopped", "reason", reason)
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), ShutdownTimeLimit)
