@@ -86,13 +86,18 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 //
 // Returns nil if the server started successfully and then cleanly shut down.
 //
-// Panics if any of the arguments are nil.
+// Panics if ctx or l is nil.
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) {
 	serveErr := make(chan error, 1)
 	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
 	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				serveErr <- newErrServePanic(p)
+			}
+		}()
 		serveErr <- srv.Serve(l)
 	}()
 	select {

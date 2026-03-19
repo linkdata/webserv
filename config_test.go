@@ -235,6 +235,26 @@ func TestConfigServeWith_NilListenerPanics(t *testing.T) {
 	_ = cfg.ServeWith(ctx, srv, nil)
 }
 
+func TestConfigServeWith_NilServerReturnsRecoveredPanicError(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = l.Close() }()
+
+	cfg := &webserv.Config{}
+	err = cfg.ServeWith(context.Background(), nil, l)
+	if err == nil {
+		t.Fatal("expected ServeWith() error")
+	}
+	if !errors.Is(err, webserv.ErrServePanic) {
+		t.Fatalf("ServeWith() error = %v, want match %v", err, webserv.ErrServePanic)
+	}
+	if errors.Unwrap(err) == nil {
+		t.Fatalf("ServeWith() error = %v, expected non-nil unwrap for recovered panic error", err)
+	}
+}
+
 func TestConfigListen_ErrorAfterBindMayPopulateListenURL(t *testing.T) {
 	const noSuchUser = "webserv-no-such-user-audit-listenurl"
 	if _, err := user.Lookup(noSuchUser); err == nil {
