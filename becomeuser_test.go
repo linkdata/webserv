@@ -1,6 +1,7 @@
 package webserv_test
 
 import (
+	"errors"
 	"os"
 	"testing"
 
@@ -19,5 +20,7 @@ func TestBecomeUser(t *testing.T) {
 	const noSuchUser = "no-such-user"
 	if err := webserv.BecomeUser(noSuchUser); err == nil {
 		t.Error(noSuchUser)
+	} else if !errors.Is(err, webserv.ErrBecomeUser) {
+		t.Errorf("expected errors.Is(err, ErrBecomeUser), got: %v", err)
 	}
 }
