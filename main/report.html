@@ -61,11 +61,13 @@
 				
 				<option value="file2">github.com/linkdata/webserv/errbecomeuser.go (100.0%)</option>
 				
-				<option value="file3">github.com/linkdata/webserv/listener.go (100.0%)</option>
+				<option value="file3">github.com/linkdata/webserv/errservepanic.go (100.0%)</option>
 				
-				<option value="file4">github.com/linkdata/webserv/loadcert.go (100.0%)</option>
+				<option value="file4">github.com/linkdata/webserv/listener.go (100.0%)</option>
 				
-				<option value="file5">github.com/linkdata/webserv/usedatadir.go (100.0%)</option>
+				<option value="file5">github.com/linkdata/webserv/loadcert.go (100.0%)</option>
+				
+				<option value="file6">github.com/linkdata/webserv/usedatadir.go (100.0%)</option>
 				
 				</select>
 			</div>
@@ -117,7 +119,7 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) <span class="cov8"
 // It sets the GID, UID and changes the USER and HOME
 // environment variables accordingly. It unsets XDG_CONFIG_HOME.
 //
-// Returns ErrBecomeUserNotImplemented if the current OS is not supported.
+// Returns an error matching ErrBecomeUser on failure.
 func BecomeUser(userName string) error <span class="cov8" title="1">{
         var err error
         if userName != "" </span><span class="cov8" title="1">{
@@ -244,15 +246,20 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov8" title
 //
 // Returns nil if the server started successfully and then cleanly shut down.
 //
-// Panics if any of the arguments are nil.
+// Panics if ctx or l is nil.
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov8" title="1">{
         serveErr := make(chan error, 1)
         sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
         defer stop()
         cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
         go func() </span><span class="cov8" title="1">{
-                serveErr &lt;- srv.Serve(l)
-        }</span>()
+                defer func() </span><span class="cov8" title="1">{
+                        if p := recover(); p != nil </span><span class="cov8" title="1">{
+                                serveErr &lt;- newErrServePanic(p)
+                        }</span>
+                }()
+                <span class="cov8" title="1">serveErr &lt;- srv.Serve(l)</span>
+        }()
         <span class="cov8" title="1">select </span>{
         case err = &lt;-serveErr:<span class="cov8" title="1"></span>
         case &lt;-sigCtx.Done():<span class="cov8" title="1">
@@ -334,6 +341,43 @@ func newErrBecomeUser(userName string, err error) error <span class="cov8" title
 </pre>
 		
 		<pre class="file" id="file3" style="display: none">package webserv
+
+import "fmt"
+
+type errServePanic struct {
+        recovered any
+        err       error
+}
+
+// ErrServePanic matches errors returned by ServeWith when srv.Serve panics.
+var ErrServePanic = errServePanic{}
+
+func (e errServePanic) Error() string <span class="cov8" title="1">{
+        return fmt.Sprintf("ServeWith(): panic in http.Server.Serve: %v", e.recovered)
+}</span>
+
+func (e errServePanic) Is(other error) (yes bool) <span class="cov8" title="1">{
+        _, yes = other.(errServePanic)
+        return
+}</span>
+
+func (e errServePanic) Unwrap() error <span class="cov8" title="1">{
+        return e.err
+}</span>
+
+func newErrServePanic(recovered any) error <span class="cov8" title="1">{
+        var err error
+        if recoveredError, ok := recovered.(error); ok </span><span class="cov8" title="1">{
+                err = recoveredError
+        }</span>
+        <span class="cov8" title="1">return errServePanic{
+                recovered: recovered,
+                err:       err,
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package webserv
 
 import (
         "crypto/tls"
@@ -445,7 +489,7 @@ func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) <span 
 }
 </pre>
 		
-		<pre class="file" id="file4" style="display: none">package webserv
+		<pre class="file" id="file5" style="display: none">package webserv
 
 import (
         "crypto/tls"
@@ -488,7 +532,7 @@ func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, 
 }
 </pre>
 		
-		<pre class="file" id="file5" style="display: none">package webserv
+		<pre class="file" id="file6" style="display: none">package webserv
 
 import (
         "io/fs"
