@@ -23,6 +23,7 @@ type Config struct {
 	DefaultDataDirSuffix string      // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
 	DataDirMode          fs.FileMode // if nonzero, create DataDir if it does not exist using this mode
 	ListenURL            string      // if set, the external URL clients can reach us at. If unset, Listen may fill this in (e.g. "https://localhost:8443"), even when Listen later returns an error after binding.
+	LogTLSErrors         bool        // if set, http.Server TLS handshake error messages are not filtered
 	Logger               Logger      // logger to use, if nil logs nothing
 }
 
@@ -86,7 +87,7 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 //
 // Returns nil if the server started successfully and then cleanly shut down.
 //
-// Panics if ctx or l is nil.
+// Panics if any of the arguments are nil.
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) {
 	serveErr := make(chan error, 1)
 	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -98,7 +99,14 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 				serveErr <- newErrServePanic(p)
 			}
 		}()
-		serveErr <- srv.Serve(l)
+		serveErr <- func() (err error) {
+			if !cfg.LogTLSErrors {
+				restore := filterTLSErrorLog(srv)
+				defer restore()
+			}
+			err = srv.Serve(l)
+			return
+		}()
 	}()
 	select {
 	case err = <-serveErr:

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
+	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -253,6 +255,91 @@ func TestConfigServeWith_NilServerReturnsRecoveredPanicError(t *testing.T) {
 	if errors.Unwrap(err) == nil {
 		t.Fatalf("ServeWith() error = %v, expected non-nil unwrap for recovered panic error", err)
 	}
+}
+
+func TestConfigServeWith_FiltersTLSHandshakeErrors(t *testing.T) {
+	withCertFiles(t, func(destdir string) {
+		logs := servePlainHTTPToTLS(t, destdir, false)
+		if strings.Contains(logs, "TLS handshake error") {
+			t.Fatalf("ServeWith() logged filtered TLS handshake error: %q", logs)
+		}
+	})
+}
+
+func TestConfigServeWith_LogTLSErrorsForwardsTLSHandshakeErrors(t *testing.T) {
+	withCertFiles(t, func(destdir string) {
+		logs := servePlainHTTPToTLS(t, destdir, true)
+		if !strings.Contains(logs, "TLS handshake error") {
+			t.Fatalf("ServeWith() did not log TLS handshake error: %q", logs)
+		}
+	})
+}
+
+func servePlainHTTPToTLS(t *testing.T, certDir string, logTLSErrors bool) (logs string) {
+	t.Helper()
+
+	cfg := &webserv.Config{
+		Address:      "127.0.0.1:0",
+		CertDir:      certDir,
+		LogTLSErrors: logTLSErrors,
+	}
+	l, err := cfg.Listen()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	previousErrorLog := log.New(&buf, "", 0)
+	srv := &http.Server{
+		ErrorLog: previousErrorLog,
+	}
+	defer func() { _ = srv.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cfg.ServeWith(ctx, srv, l)
+	}()
+
+	conn, err := net.DialTimeout("tcp", l.Addr().String(), time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = conn.SetDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = io.WriteString(conn, "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"); err != nil {
+		t.Fatal(err)
+	}
+	body, readErr := io.ReadAll(conn)
+	if closeErr := conn.Close(); readErr == nil {
+		readErr = closeErr
+	}
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if !strings.Contains(string(body), "Client sent an HTTP request to an HTTPS server") {
+		t.Fatalf("plain HTTP response = %q", string(body))
+	}
+
+	if err = srv.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err = <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for ServeWith()")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if srv.ErrorLog != previousErrorLog {
+		t.Fatal("ServeWith() did not restore previous ErrorLog")
+	}
+	logs = buf.String()
+	return
 }
 
 func TestConfigListen_ErrorAfterBindMayPopulateListenURL(t *testing.T) {
