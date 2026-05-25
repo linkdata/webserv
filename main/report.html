@@ -61,13 +61,15 @@
 				
 				<option value="file2">github.com/linkdata/webserv/errbecomeuser.go (100.0%)</option>
 				
-				<option value="file3">github.com/linkdata/webserv/errservepanic.go (100.0%)</option>
+				<option value="file3">github.com/linkdata/webserv/errorlog.go (100.0%)</option>
 				
-				<option value="file4">github.com/linkdata/webserv/listener.go (100.0%)</option>
+				<option value="file4">github.com/linkdata/webserv/errservepanic.go (100.0%)</option>
 				
-				<option value="file5">github.com/linkdata/webserv/loadcert.go (100.0%)</option>
+				<option value="file5">github.com/linkdata/webserv/listener.go (100.0%)</option>
 				
-				<option value="file6">github.com/linkdata/webserv/usedatadir.go (100.0%)</option>
+				<option value="file6">github.com/linkdata/webserv/loadcert.go (100.0%)</option>
+				
+				<option value="file7">github.com/linkdata/webserv/usedatadir.go (100.0%)</option>
 				
 				</select>
 			</div>
@@ -183,6 +185,7 @@ type Config struct {
         DefaultDataDirSuffix string      // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
         DataDirMode          fs.FileMode // if nonzero, create DataDir if it does not exist using this mode
         ListenURL            string      // if set, the external URL clients can reach us at. If unset, Listen may fill this in (e.g. "https://localhost:8443"), even when Listen later returns an error after binding.
+        LogTLSErrors         bool        // if set, http.Server TLS handshake error messages are not filtered
         Logger               Logger      // logger to use, if nil logs nothing
 }
 
@@ -246,7 +249,7 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov8" title
 //
 // Returns nil if the server started successfully and then cleanly shut down.
 //
-// Panics if ctx or l is nil.
+// Panics if any of the arguments are nil.
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov8" title="1">{
         serveErr := make(chan error, 1)
         sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -258,7 +261,14 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
                                 serveErr &lt;- newErrServePanic(p)
                         }</span>
                 }()
-                <span class="cov8" title="1">serveErr &lt;- srv.Serve(l)</span>
+                <span class="cov8" title="1">serveErr &lt;- func() (err error) </span><span class="cov8" title="1">{
+                        if !cfg.LogTLSErrors </span><span class="cov8" title="1">{
+                                restore := filterTLSErrorLog(srv)
+                                defer restore()
+                        }</span>
+                        <span class="cov8" title="1">err = srv.Serve(l)
+                        return</span>
+                }()
         }()
         <span class="cov8" title="1">select </span>{
         case err = &lt;-serveErr:<span class="cov8" title="1"></span>
@@ -342,6 +352,46 @@ func newErrBecomeUser(userName string, err error) error <span class="cov8" title
 		
 		<pre class="file" id="file3" style="display: none">package webserv
 
+import (
+        "bytes"
+        "log"
+        "net/http"
+)
+
+const tlsHandshakeErrorLogPrefix = "http: TLS handshake error from "
+
+var tlsHandshakeErrorLogPrefixBytes = []byte(tlsHandshakeErrorLogPrefix)
+
+type tlsErrorLogWriter struct {
+        previous *log.Logger
+}
+
+func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov8" title="1">{
+        if !bytes.HasPrefix(p, tlsHandshakeErrorLogPrefixBytes) </span><span class="cov8" title="1">{
+                // Preserve file attribution for loggers using Lshortfile or Llongfile.
+                if w.previous != nil </span><span class="cov8" title="1">{
+                        err = w.previous.Output(4, string(p))
+                }</span> else<span class="cov8" title="1"> {
+                        err = log.Output(4, string(p))
+                }</span>
+        }
+        <span class="cov8" title="1">if err == nil </span><span class="cov8" title="1">{
+                n = len(p)
+        }</span>
+        <span class="cov8" title="1">return</span>
+}
+
+func filterTLSErrorLog(srv *http.Server) (restore func()) <span class="cov8" title="1">{
+        previous := srv.ErrorLog
+        srv.ErrorLog = log.New(tlsErrorLogWriter{previous: previous}, "", 0)
+        return func() </span><span class="cov8" title="1">{
+                srv.ErrorLog = previous
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package webserv
+
 import "fmt"
 
 type errServePanic struct {
@@ -377,7 +427,7 @@ func newErrServePanic(recovered any) error <span class="cov8" title="1">{
 }
 </pre>
 		
-		<pre class="file" id="file4" style="display: none">package webserv
+		<pre class="file" id="file5" style="display: none">package webserv
 
 import (
         "crypto/tls"
@@ -489,7 +539,7 @@ func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) <span 
 }
 </pre>
 		
-		<pre class="file" id="file5" style="display: none">package webserv
+		<pre class="file" id="file6" style="display: none">package webserv
 
 import (
         "crypto/tls"
@@ -532,7 +582,7 @@ func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, 
 }
 </pre>
 		
-		<pre class="file" id="file6" style="display: none">package webserv
+		<pre class="file" id="file7" style="display: none">package webserv
 
 import (
         "io/fs"
