@@ -148,6 +148,7 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
 	srv := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: time.Second * 5,
+		IdleTimeout:       time.Minute,
 	}
 	return cfg.ServeWith(ctx, srv, l)
 }
