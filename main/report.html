@@ -349,7 +349,7 @@ type errBecomeUser struct {
 var ErrBecomeUser = errBecomeUser{}
 
 func (e errBecomeUser) Error() string <span class="cov3" title="2">{
-        return fmt.Sprintf("BecomeUser(\"%s\"): %v", e.userName, e.err)
+        return fmt.Sprintf("BecomeUser(%q): %v", e.userName, e.err)
 }</span>
 
 func (e errBecomeUser) Is(other error) (yes bool) <span class="cov4" title="3">{
