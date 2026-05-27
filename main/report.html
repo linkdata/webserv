@@ -173,10 +173,16 @@ import (
         "time"
 )
 
+// ShutdownTimeLimit is the maximum time ServeWith waits for graceful shutdown.
 var ShutdownTimeLimit = time.Second
 
+// Config contains the startup and serving settings for a simple web service.
+//
+// The zero value is usable: Listen serves HTTP on the default address and port,
+// Serve uses a default http.Server, no user switch or data directory setup is
+// performed, and no logs are emitted.
 type Config struct {
-        Address              string      // optional specific address (and/or port) to listen on
+        Address              string      // optional specific address to listen on; use ":port" for port-only
         CertDir              string      // if set, directory to look for fullchain.pem and privkey.pem
         FullchainPem         string      // set to override filename for "fullchain.pem"
         PrivkeyPem           string      // set to override filename for "privkey.pem"
@@ -249,7 +255,8 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov8" title
 //
 // Returns nil if the server started successfully and then cleanly shut down.
 //
-// Panics if any of the arguments are nil.
+// Panics if ctx or l is nil. Panics from srv.Serve, including a nil srv, are
+// recovered and returned as an error matching ErrServePanic.
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov8" title="1">{
         serveErr := make(chan error, 1)
         sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -327,6 +334,7 @@ type errBecomeUser struct {
         err      error
 }
 
+// ErrBecomeUser matches errors returned by BecomeUser on failure.
 var ErrBecomeUser = errBecomeUser{}
 
 func (e errBecomeUser) Error() string <span class="cov8" title="1">{
@@ -438,11 +446,13 @@ import (
 )
 
 const (
+        // FullchainPem is the default certificate chain filename used by LoadCert.
         FullchainPem = "fullchain.pem"
-        PrivkeyPem   = "privkey.pem"
+        // PrivkeyPem is the default private key filename used by LoadCert.
+        PrivkeyPem = "privkey.pem"
 )
 
-// Listener creates a net.Listener given an optional preferred address or port
+// Listener creates a net.Listener given an optional preferred address
 // and an optional directory containing certificate files.
 //
 // If certDir is not empty, it calls LoadCert to load fullchain.pem and privkey.pem.
@@ -451,6 +461,7 @@ const (
 // depending on privileges and if a certificate was loaded or not.
 //
 // These defaults can be overridden with the listenAddr argument.
+// To specify only a port, use an address like ":8080".
 //
 // Returns the net.Listener and listenURL if there was no error.
 // If certificates were successfully loaded, absCertDir will be the absolute path to that directory.
