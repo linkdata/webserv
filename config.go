@@ -35,12 +35,6 @@ type Config struct {
 
 func (cfg *Config) logInfo(msg string, keyValuePairs ...any) {
 	if cfg.Logger != nil {
-		if len(keyValuePairs) > 1 {
-			if s, ok := keyValuePairs[1].(string); ok && s == "" {
-				// suppress info msgs with a first blank string value
-				return
-			}
-		}
 		cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
 	}
 }
@@ -68,12 +62,18 @@ func (cfg *Config) logInfo(msg string, keyValuePairs ...any) {
 // later step, such as user switching or data directory setup.
 func (cfg *Config) Listen() (l net.Listener, err error) {
 	if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL); err == nil {
-		cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
+		if cfg.CertDir != "" {
+			cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
+		}
 		if err = BecomeUser(cfg.User); err == nil {
-			cfg.logInfo("user switched", "user", cfg.User)
+			if cfg.User != "" {
+				cfg.logInfo("user switched", "user", cfg.User)
+			}
 			if cfg.DataDir, err = DefaultDataDir(cfg.DataDir, cfg.DefaultDataDirSuffix); err == nil {
 				if cfg.DataDir, err = UseDataDir(cfg.DataDir, cfg.DataDirMode); err == nil {
-					cfg.logInfo("data directory", "dir", cfg.DataDir)
+					if cfg.DataDir != "" {
+						cfg.logInfo("data directory", "dir", cfg.DataDir)
+					}
 				}
 			}
 		}
