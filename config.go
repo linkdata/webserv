@@ -2,6 +2,7 @@ package webserv
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"net"
 	"net/http"
@@ -136,7 +137,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 			}
 		}
 	}
-	if err == http.ErrServerClosed {
+	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
 	}
 	return err
