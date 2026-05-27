@@ -1,3 +1,3 @@
 module github.com/linkdata/webserv
 
-go 1.23
+go 1.24
