@@ -101,7 +101,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 		panic("webserv: nil http.Server")
 	}
 	serveErr := make(chan error, 1)
-	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
 	go func() {
