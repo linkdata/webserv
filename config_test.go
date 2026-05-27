@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -21,39 +22,108 @@ import (
 	"github.com/linkdata/webserv"
 )
 
+const listeningLogMessage = "webserv: listening on"
+
+var signalTestMu sync.Mutex
+
+type notifyingLogger struct {
+	logger *slog.Logger
+	match  string
+	ready  chan struct{}
+	once   sync.Once
+}
+
+func newNotifyingLogger(w io.Writer, match string) *notifyingLogger {
+	return &notifyingLogger{
+		logger: slog.New(slog.NewTextHandler(w, nil)),
+		match:  match,
+		ready:  make(chan struct{}),
+	}
+}
+
+func (l *notifyingLogger) Info(msg string, keyValuePairs ...any) {
+	l.logger.Info(msg, keyValuePairs...)
+	if msg == l.match {
+		l.once.Do(func() {
+			close(l.ready)
+		})
+	}
+}
+
+func (l *notifyingLogger) Warn(msg string, keyValuePairs ...any) {
+	l.logger.Warn(msg, keyValuePairs...)
+}
+
+func (l *notifyingLogger) Error(msg string, keyValuePairs ...any) {
+	l.logger.Error(msg, keyValuePairs...)
+}
+
+func signalSelf(sig os.Signal) (err error) {
+	var p *os.Process
+	if p, err = os.FindProcess(os.Getpid()); err == nil {
+		err = p.Signal(sig)
+	}
+	return
+}
+
+func signalWhenReady(ctx context.Context, ready <-chan struct{}, sig os.Signal) <-chan error {
+	errc := make(chan error, 1)
+	go func() {
+		select {
+		case <-ready:
+			errc <- signalSelf(sig)
+		case <-ctx.Done():
+			errc <- ctx.Err()
+		}
+	}()
+	return errc
+}
+
+func cancelWhenReady(ctx context.Context, ready <-chan struct{}, cancel context.CancelFunc) <-chan error {
+	errc := make(chan error, 1)
+	go func() {
+		select {
+		case <-ready:
+			cancel()
+			errc <- nil
+		case <-ctx.Done():
+			errc <- ctx.Err()
+		}
+	}()
+	return errc
+}
+
 func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("process signalling from tests is not reliable on windows")
 	}
+	signalTestMu.Lock()
+	defer signalTestMu.Unlock()
+
 	withCertFiles(t, func(destdir string) {
 		homeDir := os.Getenv("HOME")
 		if st, err := os.Stat(homeDir); err != nil || !st.IsDir() {
 			homeDir = ""
 		}
 		var buf bytes.Buffer
+		logger := newNotifyingLogger(&buf, listeningLogMessage)
 		cfg := &webserv.Config{
 			CertDir:     destdir,
 			User:        os.Getenv("USER"),
 			DataDir:     homeDir,
 			DataDirMode: 0750,
-			Logger:      slog.New(slog.NewTextHandler(&buf, nil)),
+			Logger:      logger,
 		}
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second*5)
 		defer cancel()
-		go func() {
-			for {
-				time.Sleep(50 * time.Millisecond)
-				if p, err := os.FindProcess(os.Getpid()); err == nil {
-					if err = p.Signal(syscall.SIGTERM); err != nil {
-						t.Error(err)
-					}
-					return
-				}
-			}
-		}()
+		signalDone := signalWhenReady(ctx, logger.ready, syscall.SIGTERM)
 		err := cfg.ListenAndServe(ctx, nil)
 		if err != nil {
 			t.Error(err)
+			return
+		}
+		if err = <-signalDone; err != nil {
+			t.Fatal(err)
 		}
 		s := buf.String()
 		t.Log(s)
@@ -73,19 +143,22 @@ func TestConfig_ListenAndServe_Cancelled(t *testing.T) {
 			homeDir = ""
 		}
 		var buf bytes.Buffer
+		logger := newNotifyingLogger(&buf, listeningLogMessage)
 		cfg := &webserv.Config{
 			CertDir:     destdir,
 			User:        os.Getenv("USER"),
 			DataDir:     homeDir,
 			DataDirMode: 0750,
-			Logger:      slog.New(slog.NewTextHandler(&buf, nil)),
+			Logger:      logger,
 		}
-		ctx, cancel := context.WithCancel(t.Context())
-		go func() {
-			time.Sleep(50 * time.Millisecond)
-			cancel()
-		}()
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second*5)
+		defer cancel()
+		cancelDone := cancelWhenReady(ctx, logger.ready, cancel)
 		err := cfg.ListenAndServe(ctx, nil)
+		cancel()
+		if cancelErr := <-cancelDone; cancelErr != nil && !errors.Is(cancelErr, context.Canceled) {
+			t.Fatal(cancelErr)
+		}
 		if !errors.Is(err, context.Canceled) {
 			t.Error(err)
 		}
@@ -138,29 +211,43 @@ func TestConfigServeWith_ExternalCloseReturnsPromptly(t *testing.T) {
 	defer func() { _ = l.Close() }()
 
 	cfg := &webserv.Config{}
-	srv := &http.Server{}
+	accepted := make(chan struct{})
+	var acceptedOnce sync.Once
+	srv := &http.Server{
+		ConnState: func(_ net.Conn, state http.ConnState) {
+			if state == http.StateNew {
+				acceptedOnce.Do(func() {
+					close(accepted)
+				})
+			}
+		},
+	}
 	ctx, cancel := context.WithTimeout(t.Context(), 750*time.Millisecond)
 	defer cancel()
 
+	closeDone := make(chan error, 1)
 	go func() {
-		deadline := time.Now().Add(250 * time.Millisecond)
-		for {
-			conn, dialErr := net.DialTimeout("tcp", l.Addr().String(), 20*time.Millisecond)
-			if dialErr == nil {
-				_ = conn.Close()
-				break
+		var conn net.Conn
+		var err error
+		var d net.Dialer
+		if conn, err = d.DialContext(ctx, "tcp", l.Addr().String()); err == nil {
+			defer func() { _ = conn.Close() }()
+			select {
+			case <-accepted:
+				err = srv.Close()
+			case <-ctx.Done():
+				err = ctx.Err()
 			}
-			if time.Now().After(deadline) {
-				return
-			}
-			time.Sleep(time.Millisecond)
 		}
-		_ = srv.Close()
+		closeDone <- err
 	}()
 
 	start := time.Now()
 	err = cfg.ServeWith(ctx, srv, l)
 	elapsed := time.Since(start)
+	if closeErr := <-closeDone; closeErr != nil {
+		t.Fatal(closeErr)
+	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("ServeWith() blocked until context timeout (%v)", elapsed)
 	}
@@ -386,6 +473,8 @@ func TestConfigServeWith_PropagatesShutdownContextError(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("process signalling from tests is not reliable on windows")
 	}
+	signalTestMu.Lock()
+	defer signalTestMu.Unlock()
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -413,14 +502,11 @@ func TestConfigServeWith_PropagatesShutdownContextError(t *testing.T) {
 		_, _ = http.Get("http://" + l.Addr().String())
 	}()
 
-	go func() {
-		<-started
-		if p, findErr := os.FindProcess(os.Getpid()); findErr == nil {
-			_ = p.Signal(syscall.SIGTERM)
-		}
-	}()
-
+	signalDone := signalWhenReady(ctx, started, syscall.SIGTERM)
 	err = (&webserv.Config{}).ServeWith(ctx, srv, l)
+	if signalErr := <-signalDone; signalErr != nil {
+		t.Fatal(signalErr)
+	}
 	close(unblock)
 	<-reqDone
 
@@ -433,6 +519,8 @@ func TestConfigServeWith_SignalShutdownCanHangWithoutDeadline(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("process signalling from tests is not reliable on windows")
 	}
+	signalTestMu.Lock()
+	defer signalTestMu.Unlock()
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -473,11 +561,7 @@ func TestConfigServeWith_SignalShutdownCanHangWithoutDeadline(t *testing.T) {
 		t.Fatal("timed out waiting for handler to start")
 	}
 
-	p, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = p.Signal(syscall.SIGTERM); err != nil {
+	if err = signalSelf(syscall.SIGTERM); err != nil {
 		t.Fatal(err)
 	}
 
