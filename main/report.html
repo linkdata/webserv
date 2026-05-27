@@ -265,10 +265,13 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov7" title
 //
 // Returns nil if the server started successfully and then cleanly shut down.
 //
-// Panics if ctx or l is nil. Panics from srv.Serve, including a nil srv, are
-// recovered and returned as an error matching ErrServePanic.
-func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov7" title="9">{
-        serveErr := make(chan error, 1)
+// Panics if ctx, srv or l is nil. Panics from srv.Serve are recovered and
+// returned as an error matching ErrServePanic.
+func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov7" title="10">{
+        if srv == nil </span><span class="cov1" title="1">{
+                panic("webserv: nil http.Server")</span>
+        }
+        <span class="cov7" title="9">serveErr := make(chan error, 1)
         sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
         defer stop()
         cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
@@ -283,7 +286,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
                                 restore := filterTLSErrorLog(srv)
                                 defer restore()
                         }</span>
-                        <span class="cov6" title="7">err = srv.Serve(l)
+                        <span class="cov6" title="8">err = srv.Serve(l)
                         return</span>
                 }()
         }()
@@ -314,7 +317,17 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
         <span class="cov6" title="8">return err</span>
 }
 
-// Serve creates a http.Server with reasonable defaults and calls ServeWith.
+// Serve creates an http.Server with reasonable defaults and calls ServeWith.
+//
+// The server uses handler as its Handler; if handler is nil, http.DefaultServeMux
+// is used by net/http. ReadHeaderTimeout is set to 5 seconds and IdleTimeout is
+// set to 1 minute.
+//
+// Serve takes ownership of l for serving. It returns nil after a clean shutdown,
+// returns ctx.Err() when ctx cancellation starts shutdown, and otherwise returns
+// the error from serving or shutting down.
+//
+// Panics if ctx or l is nil.
 func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error <span class="cov2" title="2">{
         srv := &amp;http.Server{
                 Handler:           handler,
@@ -325,6 +338,15 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
 }</span>
 
 // ListenAndServe calls Listen followed by Serve.
+//
+// It returns ctx.Err() without opening a listener if ctx is already canceled.
+// Otherwise, it performs the setup documented by Listen and then serves requests
+// with the default server settings documented by Serve.
+//
+// The returned error is from Listen, Serve, ctx cancellation, or shutdown. A nil
+// return means the server started successfully and then shut down cleanly.
+//
+// Panics if ctx is nil.
 func (cfg *Config) ListenAndServe(ctx context.Context, handler http.Handler) (err error) <span class="cov2" title="2">{
         if err = ctx.Err(); err == nil </span><span class="cov2" title="2">{
                 var l net.Listener
@@ -403,7 +425,7 @@ func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov8"
 func filterTLSErrorLog(srv *http.Server) (restore func()) <span class="cov10" title="7">{
         previous := srv.ErrorLog
         srv.ErrorLog = log.New(tlsErrorLogWriter{previous: previous}, "", 0)
-        return func() </span><span class="cov9" title="6">{
+        return func() </span><span class="cov10" title="7">{
                 srv.ErrorLog = previous
         }</span>
 }
