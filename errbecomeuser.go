@@ -11,7 +11,7 @@ type errBecomeUser struct {
 var ErrBecomeUser = errBecomeUser{}
 
 func (e errBecomeUser) Error() string {
-	return fmt.Sprintf("BecomeUser(\"%s\"): %v", e.userName, e.err)
+	return fmt.Sprintf("BecomeUser(%q): %v", e.userName, e.err)
 }
 
 func (e errBecomeUser) Is(other error) (yes bool) {
