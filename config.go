@@ -26,7 +26,7 @@ type Config struct {
 	FullchainPem         string      // set to override filename for "fullchain.pem"
 	PrivkeyPem           string      // set to override filename for "privkey.pem"
 	User                 string      // if set, user to switch to after opening listening port
-	DataDir              string      // if set, create this directory, if unset will be filled in after Listen
+	DataDir              string      // if set, the data directory to use (created only when DataDirMode is nonzero); if unset, may be filled in after Listen
 	DefaultDataDirSuffix string      // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
 	DataDirMode          fs.FileMode // if nonzero, create DataDir if it does not exist using this mode
 	ListenURL            string      // if set, the external URL clients can reach us at. If unset, Listen may fill this in (e.g. "https://localhost:8443"), even when Listen later returns an error after binding.
@@ -97,8 +97,14 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 // Panics if ctx, srv or l is nil. Panics from srv.Serve are recovered and
 // returned as an error matching ErrServePanic.
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) {
+	if ctx == nil {
+		panic("webserv: nil context.Context")
+	}
 	if srv == nil {
 		panic("webserv: nil http.Server")
+	}
+	if l == nil {
+		panic("webserv: nil net.Listener")
 	}
 	serveErr := make(chan error, 1)
 	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)

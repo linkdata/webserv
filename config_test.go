@@ -319,23 +319,44 @@ func TestConfigListen_ErrorStillAbsolutizesCertDir(t *testing.T) {
 	}
 }
 
-func TestConfigServeWith_NilListenerPanics(t *testing.T) {
-	cfg := &webserv.Config{}
-	srv := &http.Server{}
-
-	panicked := false
+func assertServeWithPanics(t *testing.T, wantPanic string, fn func()) {
+	t.Helper()
 	defer func() {
-		if r := recover(); r != nil {
-			panicked = true
-		}
-		if !panicked {
-			t.Fatal("expected ServeWith() to panic for nil listener")
+		switch r := recover().(type) {
+		case nil:
+			t.Fatalf("expected ServeWith() to panic with %q", wantPanic)
+		case string:
+			if r != wantPanic {
+				t.Fatalf("ServeWith() panic = %q, want %q", r, wantPanic)
+			}
+		default:
+			t.Fatalf("ServeWith() panic = %v (%T), want string %q", r, r, wantPanic)
 		}
 	}()
+	fn()
+}
 
+func TestConfigServeWith_NilContextPanics(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = l.Close() }()
+
+	cfg := &webserv.Config{}
+	var nilCtx context.Context
+	assertServeWithPanics(t, "webserv: nil context.Context", func() {
+		_ = cfg.ServeWith(nilCtx, &http.Server{}, l)
+	})
+}
+
+func TestConfigServeWith_NilListenerPanics(t *testing.T) {
+	cfg := &webserv.Config{}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	_ = cfg.ServeWith(ctx, srv, nil)
+	assertServeWithPanics(t, "webserv: nil net.Listener", func() {
+		_ = cfg.ServeWith(ctx, &http.Server{}, nil)
+	})
 }
 
 func TestConfigServeWith_NilServerPanics(t *testing.T) {
@@ -345,18 +366,10 @@ func TestConfigServeWith_NilServerPanics(t *testing.T) {
 	}
 	defer func() { _ = l.Close() }()
 
-	panicked := false
-	defer func() {
-		if r := recover(); r != nil {
-			panicked = true
-		}
-		if !panicked {
-			t.Fatal("expected ServeWith() to panic for nil server")
-		}
-	}()
-
 	cfg := &webserv.Config{}
-	_ = cfg.ServeWith(t.Context(), nil, l)
+	assertServeWithPanics(t, "webserv: nil http.Server", func() {
+		_ = cfg.ServeWith(t.Context(), nil, l)
+	})
 }
 
 func TestConfigServeWith_RecoversServePanic(t *testing.T) {
