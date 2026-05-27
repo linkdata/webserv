@@ -11,10 +11,16 @@ import (
 	"time"
 )
 
+// ShutdownTimeLimit is the maximum time ServeWith waits for graceful shutdown.
 var ShutdownTimeLimit = time.Second
 
+// Config contains the startup and serving settings for a simple web service.
+//
+// The zero value is usable: Listen serves HTTP on the default address and port,
+// Serve uses a default http.Server, no user switch or data directory setup is
+// performed, and no logs are emitted.
 type Config struct {
-	Address              string      // optional specific address (and/or port) to listen on
+	Address              string      // optional specific address to listen on; use ":port" for port-only
 	CertDir              string      // if set, directory to look for fullchain.pem and privkey.pem
 	FullchainPem         string      // set to override filename for "fullchain.pem"
 	PrivkeyPem           string      // set to override filename for "privkey.pem"
@@ -87,7 +93,8 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 //
 // Returns nil if the server started successfully and then cleanly shut down.
 //
-// Panics if any of the arguments are nil.
+// Panics if ctx or l is nil. Panics from srv.Serve, including a nil srv, are
+// recovered and returned as an error matching ErrServePanic.
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) {
 	serveErr := make(chan error, 1)
 	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)

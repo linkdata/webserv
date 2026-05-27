@@ -9,11 +9,13 @@ import (
 )
 
 const (
+	// FullchainPem is the default certificate chain filename used by LoadCert.
 	FullchainPem = "fullchain.pem"
-	PrivkeyPem   = "privkey.pem"
+	// PrivkeyPem is the default private key filename used by LoadCert.
+	PrivkeyPem = "privkey.pem"
 )
 
-// Listener creates a net.Listener given an optional preferred address or port
+// Listener creates a net.Listener given an optional preferred address
 // and an optional directory containing certificate files.
 //
 // If certDir is not empty, it calls LoadCert to load fullchain.pem and privkey.pem.
@@ -22,6 +24,7 @@ const (
 // depending on privileges and if a certificate was loaded or not.
 //
 // These defaults can be overridden with the listenAddr argument.
+// To specify only a port, use an address like ":8080".
 //
 // Returns the net.Listener and listenURL if there was no error.
 // If certificates were successfully loaded, absCertDir will be the absolute path to that directory.

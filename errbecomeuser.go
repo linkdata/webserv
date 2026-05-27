@@ -7,6 +7,7 @@ type errBecomeUser struct {
 	err      error
 }
 
+// ErrBecomeUser matches errors returned by BecomeUser on failure.
 var ErrBecomeUser = errBecomeUser{}
 
 func (e errBecomeUser) Error() string {

@@ -8,7 +8,9 @@ type recordingLogger struct {
 	messages []string
 }
 
-func (l *recordingLogger) Info(msg string, keyValuePairs ...any)  { l.messages = append(l.messages, msg) }
+func (l *recordingLogger) Info(msg string, keyValuePairs ...any) {
+	l.messages = append(l.messages, msg)
+}
 func (l *recordingLogger) Warn(msg string, keyValuePairs ...any)  {}
 func (l *recordingLogger) Error(msg string, keyValuePairs ...any) {}
 

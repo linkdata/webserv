@@ -38,7 +38,7 @@ func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 			DataDirMode: 0750,
 			Logger:      slog.New(slog.NewTextHandler(&buf, nil)),
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second*5)
 		defer cancel()
 		go func() {
 			for {
@@ -80,7 +80,7 @@ func TestConfig_ListenAndServe_Cancelled(t *testing.T) {
 			DataDirMode: 0750,
 			Logger:      slog.New(slog.NewTextHandler(&buf, nil)),
 		}
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		go func() {
 			time.Sleep(50 * time.Millisecond)
 			cancel()
@@ -139,7 +139,7 @@ func TestConfigServeWith_ExternalCloseReturnsPromptly(t *testing.T) {
 
 	cfg := &webserv.Config{}
 	srv := &http.Server{}
-	ctx, cancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 750*time.Millisecond)
 	defer cancel()
 
 	go func() {
@@ -232,7 +232,7 @@ func TestConfigServeWith_NilListenerPanics(t *testing.T) {
 		}
 	}()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_ = cfg.ServeWith(ctx, srv, nil)
 }
@@ -245,7 +245,7 @@ func TestConfigServeWith_NilServerReturnsRecoveredPanicError(t *testing.T) {
 	defer func() { _ = l.Close() }()
 
 	cfg := &webserv.Config{}
-	err = cfg.ServeWith(context.Background(), nil, l)
+	err = cfg.ServeWith(t.Context(), nil, l)
 	if err == nil {
 		t.Fatal("expected ServeWith() error")
 	}
@@ -295,7 +295,7 @@ func servePlainHTTPToTLS(t *testing.T, certDir string, logTLSErrors bool) (logs 
 	}
 	defer func() { _ = srv.Close() }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 
 	done := make(chan error, 1)
@@ -405,7 +405,7 @@ func TestConfigServeWith_PropagatesShutdownContextError(t *testing.T) {
 		}),
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 	defer cancel()
 
 	go func() {
@@ -458,7 +458,7 @@ func TestConfigServeWith_SignalShutdownCanHangWithoutDeadline(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- (&webserv.Config{}).ServeWith(context.Background(), srv, l)
+		done <- (&webserv.Config{}).ServeWith(t.Context(), srv, l)
 	}()
 
 	go func() {
