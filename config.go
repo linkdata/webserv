@@ -146,7 +146,17 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 	return err
 }
 
-// Serve creates a http.Server with reasonable defaults and calls ServeWith.
+// Serve creates an http.Server with reasonable defaults and calls ServeWith.
+//
+// The server uses handler as its Handler; if handler is nil, http.DefaultServeMux
+// is used by net/http. ReadHeaderTimeout is set to 5 seconds and IdleTimeout is
+// set to 1 minute.
+//
+// Serve takes ownership of l for serving. It returns nil after a clean shutdown,
+// returns ctx.Err() when ctx cancellation starts shutdown, and otherwise returns
+// the error from serving or shutting down.
+//
+// Panics if ctx or l is nil.
 func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error {
 	srv := &http.Server{
 		Handler:           handler,
@@ -157,6 +167,15 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
 }
 
 // ListenAndServe calls Listen followed by Serve.
+//
+// It returns ctx.Err() without opening a listener if ctx is already canceled.
+// Otherwise, it performs the setup documented by Listen and then serves requests
+// with the default server settings documented by Serve.
+//
+// The returned error is from Listen, Serve, ctx cancellation, or shutdown. A nil
+// return means the server started successfully and then shut down cleanly.
+//
+// Panics if ctx is nil.
 func (cfg *Config) ListenAndServe(ctx context.Context, handler http.Handler) (err error) {
 	if err = ctx.Err(); err == nil {
 		var l net.Listener
