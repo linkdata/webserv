@@ -12,8 +12,7 @@ import (
 	"time"
 )
 
-// ShutdownTimeLimit is the maximum time ServeWith waits for graceful shutdown.
-var ShutdownTimeLimit = time.Second
+const defaultShutdownTimeLimit = time.Second
 
 // Config contains the startup and serving settings for a simple web service.
 //
@@ -21,23 +20,31 @@ var ShutdownTimeLimit = time.Second
 // Serve uses a default http.Server, no user switch or data directory setup is
 // performed, and no logs are emitted.
 type Config struct {
-	Address              string      // optional specific address to listen on; use ":port" for port-only
-	CertDir              string      // if set, directory to look for fullchain.pem and privkey.pem
-	FullchainPem         string      // set to override filename for "fullchain.pem"
-	PrivkeyPem           string      // set to override filename for "privkey.pem"
-	User                 string      // if set, user to switch to after opening listening port
-	DataDir              string      // if set, the data directory to use (created only when DataDirMode is nonzero); if unset, may be filled in after Listen
-	DefaultDataDirSuffix string      // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
-	DataDirMode          fs.FileMode // if nonzero, create DataDir if it does not exist using this mode
-	ListenURL            string      // if set, the external URL clients can reach us at. If unset, Listen may fill this in (e.g. "https://localhost:8443"), even when Listen later returns an error after binding.
-	LogTLSErrors         bool        // if set, http.Server TLS handshake error messages are not filtered
-	Logger               Logger      // logger to use, if nil logs nothing
+	Address              string        // optional specific address to listen on; use ":port" for port-only
+	CertDir              string        // if set, directory to look for fullchain.pem and privkey.pem
+	FullchainPem         string        // set to override filename for "fullchain.pem"
+	PrivkeyPem           string        // set to override filename for "privkey.pem"
+	User                 string        // if set, user to switch to after opening listening port
+	DataDir              string        // if set, the data directory to use (created only when DataDirMode is nonzero); if unset, may be filled in after Listen
+	DefaultDataDirSuffix string        // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
+	DataDirMode          fs.FileMode   // if nonzero, create DataDir if it does not exist using this mode
+	ListenURL            string        // if set, the external URL clients can reach us at. If unset, Listen may fill this in (e.g. "https://localhost:8443"), even when Listen later returns an error after binding.
+	ShutdownTimeLimit    time.Duration // maximum time ServeWith waits for graceful shutdown; zero uses a 1 second default
+	LogTLSErrors         bool          // if set, http.Server TLS handshake error messages are not filtered
+	Logger               Logger        // logger to use, if nil logs nothing
 }
 
 func (cfg *Config) logInfo(msg string, keyValuePairs ...any) {
 	if cfg.Logger != nil {
 		cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
 	}
+}
+
+func (cfg *Config) shutdownTimeLimit() (limit time.Duration) {
+	if limit = cfg.ShutdownTimeLimit; limit == 0 {
+		limit = defaultShutdownTimeLimit
+	}
+	return
 }
 
 // Listen performs initial setup for a simple web server and returns a
@@ -93,6 +100,8 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 // If ctx is canceled, the server will be shut down and this function returns with ctx.Err().
 //
 // Returns nil if the server started successfully and then cleanly shut down.
+// Graceful shutdown waits for cfg.ShutdownTimeLimit, or 1 second when
+// cfg.ShutdownTimeLimit is zero.
 //
 // Panics if ctx, srv or l is nil. Panics from srv.Serve are recovered and
 // returned as an error matching ErrServePanic.
@@ -134,7 +143,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 			reason = context.Cause(sigCtx)
 		}
 		cfg.logInfo("stopped", "reason", reason)
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), ShutdownTimeLimit)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.shutdownTimeLimit())
 		shutdownErr := srv.Shutdown(shutdownCtx)
 		shutdownCancel()
 		serveExitErr := <-serveErr

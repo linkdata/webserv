@@ -2,6 +2,7 @@ package webserv
 
 import (
 	"testing"
+	"time"
 )
 
 type recordingLogger struct {
@@ -39,6 +40,20 @@ func TestLogInfo_NilLoggerDoesNotPanic(t *testing.T) {
 	cfg := &Config{}
 	cfg.logInfo("should not panic")
 	cfg.logInfo("should not panic", "key", "value")
+}
+
+func TestShutdownTimeLimit_ZeroUsesDefault(t *testing.T) {
+	cfg := &Config{}
+	if got := cfg.shutdownTimeLimit(); got != defaultShutdownTimeLimit {
+		t.Fatalf("shutdownTimeLimit() = %v, want %v", got, defaultShutdownTimeLimit)
+	}
+}
+
+func TestShutdownTimeLimit_ConfigValueOverridesDefault(t *testing.T) {
+	cfg := &Config{ShutdownTimeLimit: 25 * time.Millisecond}
+	if got := cfg.shutdownTimeLimit(); got != cfg.ShutdownTimeLimit {
+		t.Fatalf("shutdownTimeLimit() = %v, want %v", got, cfg.ShutdownTimeLimit)
+	}
 }
 
 // TestListen_DoesNotLogEmptyValues verifies that the optional setup log lines

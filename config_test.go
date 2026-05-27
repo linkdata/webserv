@@ -559,7 +559,7 @@ func TestConfigServeWith_PropagatesShutdownContextError(t *testing.T) {
 	}
 }
 
-func TestConfigServeWith_SignalShutdownCanHangWithoutDeadline(t *testing.T) {
+func TestConfigServeWith_SignalShutdownUsesConfigShutdownTimeLimit(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("process signalling from tests is not reliable on windows")
 	}
@@ -584,18 +584,19 @@ func TestConfigServeWith_SignalShutdownCanHangWithoutDeadline(t *testing.T) {
 	}
 	defer func() { _ = srv.Close() }()
 
-	savedTimeLimit := webserv.ShutdownTimeLimit
-	defer func() { webserv.ShutdownTimeLimit = savedTimeLimit }()
-	webserv.ShutdownTimeLimit = time.Millisecond * 10
+	const shutdownTimeLimit = time.Millisecond * 10
+	cfg := &webserv.Config{
+		ShutdownTimeLimit: shutdownTimeLimit,
+	}
 
 	done := make(chan error, 1)
 	go func() {
-		done <- (&webserv.Config{}).ServeWith(t.Context(), srv, l)
+		done <- cfg.ServeWith(t.Context(), srv, l)
 	}()
 
 	go func() {
 		defer close(reqDone)
-		client := &http.Client{Timeout: 2 * webserv.ShutdownTimeLimit}
+		client := &http.Client{Timeout: 2 * shutdownTimeLimit}
 		_, _ = client.Get("http://" + l.Addr().String())
 	}()
 

@@ -35,7 +35,7 @@ Wiring up `http.Server` and `net.Listener` by hand is easy to get subtly wrong. 
 
 * **One call does the setup.** `ListenAndServe` loads certificates, opens the listener, drops privileges, prepares the data directory and serves — in the right order, with errors propagated.
 * **Automatic address defaults.** Port and scheme are chosen from privilege level and whether a certificate was loaded (80/443 as root, 8080/8443 otherwise). Override with a full address or just `:port`.
-* **Graceful shutdown.** SIGINT/SIGTERM, or canceling the context, triggers `srv.Shutdown` bounded by `ShutdownTimeLimit`, so in-flight requests can finish and the port is released cleanly.
+* **Graceful shutdown.** SIGINT/SIGTERM, or canceling the context, triggers `srv.Shutdown` bounded by `Config.ShutdownTimeLimit`, so in-flight requests can finish and the port is released cleanly.
 * **A connectable URL.** `cfg.ListenURL` is filled in with a printable, reachable URL (resolving wildcard/loopback binds to `localhost` or the certificate's DNS name) — handy for logs and links.
 * **Managed data directory.** Resolves `DataDir` to an absolute path and optionally creates it, defaulting under the user config directory.
 * **Bring your own logger.** The `Logger` interface matches `log/slog`, so structured startup and shutdown logging drops right in.
