@@ -76,8 +76,17 @@
 			<div id="legend">
 				<span>not tracked</span>
 			
-				<span class="cov0">not covered</span>
-				<span class="cov8">covered</span>
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
 			
 			</div>
 		</div>
@@ -96,7 +105,7 @@ import (
 
 var (
         lookupUserFn = user.Lookup
-        groupIDsFn   = func(u *user.User) ([]string, error) <span class="cov8" title="1">{ return u.GroupIds() }</span>
+        groupIDsFn   = func(u *user.User) ([]string, error) <span class="cov1" title="1">{ return u.GroupIds() }</span>
         geteuidFn    = os.Geteuid
         setgroupsFn  = syscall.Setgroups
         setgidFn     = syscall.Setgid
@@ -105,15 +114,15 @@ var (
         setenvFn     = os.Setenv
 )
 
-func parseGroupIDs(groupIDs []string) (gids []int, err error) <span class="cov8" title="1">{
+func parseGroupIDs(groupIDs []string) (gids []int, err error) <span class="cov5" title="4">{
         gids = make([]int, 0, len(groupIDs))
-        for i := 0; i &lt; len(groupIDs) &amp;&amp; err == nil; i++ </span><span class="cov8" title="1">{
+        for i := 0; i &lt; len(groupIDs) &amp;&amp; err == nil; i++ </span><span class="cov5" title="4">{
                 var gid int
-                if gid, err = strconv.Atoi(groupIDs[i]); err == nil </span><span class="cov8" title="1">{
+                if gid, err = strconv.Atoi(groupIDs[i]); err == nil </span><span class="cov3" title="2">{
                         gids = append(gids, gid)
                 }</span>
         }
-        <span class="cov8" title="1">return</span>
+        <span class="cov5" title="4">return</span>
 }
 
 // BecomeUser switches to the given userName if not empty.
@@ -122,31 +131,31 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) <span class="cov8"
 // environment variables accordingly. It unsets XDG_CONFIG_HOME.
 //
 // Returns an error matching ErrBecomeUser on failure.
-func BecomeUser(userName string) error <span class="cov8" title="1">{
+func BecomeUser(userName string) error <span class="cov10" title="16">{
         var err error
-        if userName != "" </span><span class="cov8" title="1">{
+        if userName != "" </span><span class="cov8" title="11">{
                 var u *user.User
-                if u, err = lookupUserFn(userName); err == nil </span><span class="cov8" title="1">{
+                if u, err = lookupUserFn(userName); err == nil </span><span class="cov7" title="7">{
                         var uid, gid int
-                        if uid, err = strconv.Atoi(u.Uid); err == nil </span><span class="cov8" title="1">{
-                                if gid, err = strconv.Atoi(u.Gid); err == nil </span><span class="cov8" title="1">{
-                                        if geteuidFn() == 0 </span><span class="cov8" title="1">{
+                        if uid, err = strconv.Atoi(u.Uid); err == nil </span><span class="cov7" title="7">{
+                                if gid, err = strconv.Atoi(u.Gid); err == nil </span><span class="cov7" title="7">{
+                                        if geteuidFn() == 0 </span><span class="cov4" title="3">{
                                                 var groupIDs []string
-                                                if groupIDs, err = groupIDsFn(u); err == nil </span><span class="cov8" title="1">{
+                                                if groupIDs, err = groupIDsFn(u); err == nil </span><span class="cov4" title="3">{
                                                         var gids []int
-                                                        if gids, err = parseGroupIDs(groupIDs); err == nil </span><span class="cov8" title="1">{
-                                                                if len(gids) == 0 </span><span class="cov8" title="1">{
+                                                        if gids, err = parseGroupIDs(groupIDs); err == nil </span><span class="cov3" title="2">{
+                                                                if len(gids) == 0 </span><span class="cov1" title="1">{
                                                                         gids = []int{gid}
                                                                 }</span>
-                                                                <span class="cov8" title="1">err = setgroupsFn(gids)</span>
+                                                                <span class="cov3" title="2">err = setgroupsFn(gids)</span>
                                                         }
                                                 }
                                         }
-                                        <span class="cov8" title="1">if err == nil </span><span class="cov8" title="1">{
-                                                if err = setgidFn(gid); err == nil </span><span class="cov8" title="1">{
-                                                        if err = setuidFn(uid); err == nil </span><span class="cov8" title="1">{
+                                        <span class="cov7" title="7">if err == nil </span><span class="cov6" title="6">{
+                                                if err = setgidFn(gid); err == nil </span><span class="cov6" title="6">{
+                                                        if err = setuidFn(uid); err == nil </span><span class="cov6" title="6">{
                                                                 _ = unsetenvFn("XDG_CONFIG_HOME")
-                                                                if err = setenvFn("HOME", u.HomeDir); err == nil </span><span class="cov8" title="1">{
+                                                                if err = setenvFn("HOME", u.HomeDir); err == nil </span><span class="cov6" title="6">{
                                                                         err = setenvFn("USER", u.Username)
                                                                 }</span>
                                                         }
@@ -156,7 +165,7 @@ func BecomeUser(userName string) error <span class="cov8" title="1">{
                         }
                 }
         }
-        <span class="cov8" title="1">return newErrBecomeUser(userName, err)</span>
+        <span class="cov10" title="16">return newErrBecomeUser(userName, err)</span>
 }
 </pre>
 		
@@ -164,6 +173,7 @@ func BecomeUser(userName string) error <span class="cov8" title="1">{
 
 import (
         "context"
+        "errors"
         "io/fs"
         "net"
         "net/http"
@@ -195,16 +205,10 @@ type Config struct {
         Logger               Logger      // logger to use, if nil logs nothing
 }
 
-func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov8" title="1">{
-        if cfg.Logger != nil </span><span class="cov8" title="1">{
-                if len(keyValuePairs) &gt; 1 </span><span class="cov8" title="1">{
-                        if s, ok := keyValuePairs[1].(string); ok &amp;&amp; s == "" </span><span class="cov8" title="1">{
-                                // suppress info msgs with a first blank string value
-                                return
-                        }</span>
-                }
-                <span class="cov8" title="1">cfg.Logger.Info("webserv: "+msg, keyValuePairs...)</span>
-        }
+func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov10" title="24">{
+        if cfg.Logger != nil </span><span class="cov8" title="12">{
+                cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
+        }</span>
 }
 
 // Listen performs initial setup for a simple web server and returns a
@@ -228,26 +232,32 @@ func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov8" 
 // URL like "http://localhost:80" as soon as the socket is opened.
 // Therefore cfg.ListenURL can be non-empty even if Listen returns an error from a
 // later step, such as user switching or data directory setup.
-func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov8" title="1">{
-        if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL); err == nil </span><span class="cov8" title="1">{
-                cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
-                if err = BecomeUser(cfg.User); err == nil </span><span class="cov8" title="1">{
-                        cfg.logInfo("user switched", "user", cfg.User)
-                        if cfg.DataDir, err = DefaultDataDir(cfg.DataDir, cfg.DefaultDataDirSuffix); err == nil </span><span class="cov8" title="1">{
-                                if cfg.DataDir, err = UseDataDir(cfg.DataDir, cfg.DataDirMode); err == nil </span><span class="cov8" title="1">{
-                                        cfg.logInfo("data directory", "dir", cfg.DataDir)
-                                }</span>
+func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov7" title="10">{
+        if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL); err == nil </span><span class="cov6" title="8">{
+                if cfg.CertDir != "" </span><span class="cov4" title="4">{
+                        cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
+                }</span>
+                <span class="cov6" title="8">if err = BecomeUser(cfg.User); err == nil </span><span class="cov6" title="6">{
+                        if cfg.User != "" </span><span class="cov2" title="2">{
+                                cfg.logInfo("user switched", "user", cfg.User)
+                        }</span>
+                        <span class="cov6" title="6">if cfg.DataDir, err = DefaultDataDir(cfg.DataDir, cfg.DefaultDataDirSuffix); err == nil </span><span class="cov6" title="6">{
+                                if cfg.DataDir, err = UseDataDir(cfg.DataDir, cfg.DataDirMode); err == nil </span><span class="cov6" title="6">{
+                                        if cfg.DataDir != "" </span><span class="cov2" title="2">{
+                                                cfg.logInfo("data directory", "dir", cfg.DataDir)
+                                        }</span>
+                                }
                         }
                 }
         }
-        <span class="cov8" title="1">if err != nil </span><span class="cov8" title="1">{
+        <span class="cov7" title="10">if err != nil </span><span class="cov4" title="4">{
                 cfg.DataDir = ""
-                if l != nil </span><span class="cov8" title="1">{
+                if l != nil </span><span class="cov2" title="2">{
                         _ = l.Close()
                         l = nil
                 }</span>
         }
-        <span class="cov8" title="1">return</span>
+        <span class="cov7" title="10">return</span>
 }
 
 // ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls srv.Serve(l).
@@ -257,71 +267,72 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov8" title
 //
 // Panics if ctx or l is nil. Panics from srv.Serve, including a nil srv, are
 // recovered and returned as an error matching ErrServePanic.
-func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov8" title="1">{
+func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov7" title="9">{
         serveErr := make(chan error, 1)
         sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
         defer stop()
         cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
-        go func() </span><span class="cov8" title="1">{
-                defer func() </span><span class="cov8" title="1">{
-                        if p := recover(); p != nil </span><span class="cov8" title="1">{
+        go func() </span><span class="cov6" title="8">{
+                defer func() </span><span class="cov6" title="8">{
+                        if p := recover(); p != nil </span><span class="cov1" title="1">{
                                 serveErr &lt;- newErrServePanic(p)
                         }</span>
                 }()
-                <span class="cov8" title="1">serveErr &lt;- func() (err error) </span><span class="cov8" title="1">{
-                        if !cfg.LogTLSErrors </span><span class="cov8" title="1">{
+                <span class="cov6" title="8">serveErr &lt;- func() (err error) </span><span class="cov6" title="8">{
+                        if !cfg.LogTLSErrors </span><span class="cov6" title="7">{
                                 restore := filterTLSErrorLog(srv)
                                 defer restore()
                         }</span>
-                        <span class="cov8" title="1">err = srv.Serve(l)
+                        <span class="cov6" title="7">err = srv.Serve(l)
                         return</span>
                 }()
         }()
-        <span class="cov8" title="1">select </span>{
-        case err = &lt;-serveErr:<span class="cov8" title="1"></span>
-        case &lt;-sigCtx.Done():<span class="cov8" title="1">
+        <span class="cov6" title="8">select </span>{
+        case err = &lt;-serveErr:<span class="cov4" title="4"></span>
+        case &lt;-sigCtx.Done():<span class="cov4" title="4">
                 err = ctx.Err()
                 var reason error
-                if reason = context.Cause(ctx); reason == nil </span><span class="cov8" title="1">{
+                if reason = context.Cause(ctx); reason == nil </span><span class="cov4" title="3">{
                         reason = context.Cause(sigCtx)
                 }</span>
-                <span class="cov8" title="1">cfg.logInfo("stopped", "reason", reason)
+                <span class="cov4" title="4">cfg.logInfo("stopped", "reason", reason)
                 shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), ShutdownTimeLimit)
                 shutdownErr := srv.Shutdown(shutdownCtx)
                 shutdownCancel()
                 serveExitErr := &lt;-serveErr
-                if err == nil </span><span class="cov8" title="1">{
-                        if shutdownErr != nil </span><span class="cov8" title="1">{
+                if err == nil </span><span class="cov4" title="3">{
+                        if shutdownErr != nil </span><span class="cov2" title="2">{
                                 err = shutdownErr
-                        }</span> else<span class="cov8" title="1"> {
+                        }</span> else<span class="cov1" title="1"> {
                                 err = serveExitErr
                         }</span>
                 }
         }
-        <span class="cov8" title="1">if err == http.ErrServerClosed </span><span class="cov8" title="1">{
+        <span class="cov6" title="8">if errors.Is(err, http.ErrServerClosed) </span><span class="cov4" title="4">{
                 err = nil
         }</span>
-        <span class="cov8" title="1">return err</span>
+        <span class="cov6" title="8">return err</span>
 }
 
 // Serve creates a http.Server with reasonable defaults and calls ServeWith.
-func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error <span class="cov8" title="1">{
+func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error <span class="cov2" title="2">{
         srv := &amp;http.Server{
                 Handler:           handler,
                 ReadHeaderTimeout: time.Second * 5,
+                IdleTimeout:       time.Minute,
         }
         return cfg.ServeWith(ctx, srv, l)
 }</span>
 
 // ListenAndServe calls Listen followed by Serve.
-func (cfg *Config) ListenAndServe(ctx context.Context, handler http.Handler) (err error) <span class="cov8" title="1">{
-        if err = ctx.Err(); err == nil </span><span class="cov8" title="1">{
+func (cfg *Config) ListenAndServe(ctx context.Context, handler http.Handler) (err error) <span class="cov2" title="2">{
+        if err = ctx.Err(); err == nil </span><span class="cov2" title="2">{
                 var l net.Listener
-                if l, err = cfg.Listen(); err == nil </span><span class="cov8" title="1">{
+                if l, err = cfg.Listen(); err == nil </span><span class="cov2" title="2">{
                         err = cfg.Serve(ctx, l, handler)
                 }</span>
         }
-        <span class="cov8" title="1">return</span>
+        <span class="cov2" title="2">return</span>
 }
 </pre>
 		
@@ -337,24 +348,24 @@ type errBecomeUser struct {
 // ErrBecomeUser matches errors returned by BecomeUser on failure.
 var ErrBecomeUser = errBecomeUser{}
 
-func (e errBecomeUser) Error() string <span class="cov8" title="1">{
+func (e errBecomeUser) Error() string <span class="cov3" title="2">{
         return fmt.Sprintf("BecomeUser(\"%s\"): %v", e.userName, e.err)
 }</span>
 
-func (e errBecomeUser) Is(other error) (yes bool) <span class="cov8" title="1">{
+func (e errBecomeUser) Is(other error) (yes bool) <span class="cov4" title="3">{
         _, yes = other.(errBecomeUser)
         return
 }</span>
 
-func (e errBecomeUser) Unwrap() error <span class="cov8" title="1">{
+func (e errBecomeUser) Unwrap() error <span class="cov1" title="1">{
         return e.err
 }</span>
 
-func newErrBecomeUser(userName string, err error) error <span class="cov8" title="1">{
-        if err != nil </span><span class="cov8" title="1">{
+func newErrBecomeUser(userName string, err error) error <span class="cov10" title="16">{
+        if err != nil </span><span class="cov6" title="5">{
                 err = errBecomeUser{userName: userName, err: err}
         }</span>
-        <span class="cov8" title="1">return err</span>
+        <span class="cov10" title="16">return err</span>
 }
 </pre>
 		
@@ -374,25 +385,25 @@ type tlsErrorLogWriter struct {
         previous *log.Logger
 }
 
-func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov8" title="1">{
-        if !bytes.HasPrefix(p, tlsHandshakeErrorLogPrefixBytes) </span><span class="cov8" title="1">{
+func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov8" title="5">{
+        if !bytes.HasPrefix(p, tlsHandshakeErrorLogPrefixBytes) </span><span class="cov6" title="3">{
                 // Preserve file attribution for loggers using Lshortfile or Llongfile.
-                if w.previous != nil </span><span class="cov8" title="1">{
+                if w.previous != nil </span><span class="cov4" title="2">{
                         err = w.previous.Output(4, string(p))
-                }</span> else<span class="cov8" title="1"> {
+                }</span> else<span class="cov1" title="1"> {
                         err = log.Output(4, string(p))
                 }</span>
         }
-        <span class="cov8" title="1">if err == nil </span><span class="cov8" title="1">{
+        <span class="cov8" title="5">if err == nil </span><span class="cov8" title="5">{
                 n = len(p)
         }</span>
-        <span class="cov8" title="1">return</span>
+        <span class="cov8" title="5">return</span>
 }
 
-func filterTLSErrorLog(srv *http.Server) (restore func()) <span class="cov8" title="1">{
+func filterTLSErrorLog(srv *http.Server) (restore func()) <span class="cov10" title="7">{
         previous := srv.ErrorLog
         srv.ErrorLog = log.New(tlsErrorLogWriter{previous: previous}, "", 0)
-        return func() </span><span class="cov8" title="1">{
+        return func() </span><span class="cov9" title="6">{
                 srv.ErrorLog = previous
         }</span>
 }
@@ -410,25 +421,25 @@ type errServePanic struct {
 // ErrServePanic matches errors returned by ServeWith when srv.Serve panics.
 var ErrServePanic = errServePanic{}
 
-func (e errServePanic) Error() string <span class="cov8" title="1">{
+func (e errServePanic) Error() string <span class="cov4" title="2">{
         return fmt.Sprintf("ServeWith(): panic in http.Server.Serve: %v", e.recovered)
 }</span>
 
-func (e errServePanic) Is(other error) (yes bool) <span class="cov8" title="1">{
+func (e errServePanic) Is(other error) (yes bool) <span class="cov10" title="5">{
         _, yes = other.(errServePanic)
         return
 }</span>
 
-func (e errServePanic) Unwrap() error <span class="cov8" title="1">{
+func (e errServePanic) Unwrap() error <span class="cov8" title="4">{
         return e.err
 }</span>
 
-func newErrServePanic(recovered any) error <span class="cov8" title="1">{
+func newErrServePanic(recovered any) error <span class="cov7" title="3">{
         var err error
-        if recoveredError, ok := recovered.(error); ok </span><span class="cov8" title="1">{
+        if recoveredError, ok := recovered.(error); ok </span><span class="cov4" title="2">{
                 err = recoveredError
         }</span>
-        <span class="cov8" title="1">return errServePanic{
+        <span class="cov7" title="3">return errServePanic{
                 recovered: recovered,
                 err:       err,
         }</span>
@@ -465,14 +476,14 @@ const (
 //
 // Returns the net.Listener and listenURL if there was no error.
 // If certificates were successfully loaded, absCertDir will be the absolute path to that directory.
-func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) <span class="cov8" title="1">{
+func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) <span class="cov8" title="19">{
         var cert *tls.Certificate
-        if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil </span><span class="cov8" title="1">{
+        if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil </span><span class="cov8" title="18">{
                 var bindAddr string
                 var schemesuffix string
-                if cert != nil </span><span class="cov8" title="1">{
+                if cert != nil </span><span class="cov5" title="6">{
                         schemesuffix = "s"
-                        if bindAddr, err = normalizeListenAddr(listenAddr, "443", "8443"); err == nil </span><span class="cov8" title="1">{
+                        if bindAddr, err = normalizeListenAddr(listenAddr, "443", "8443"); err == nil </span><span class="cov5" title="6">{
                                 l, err = tls.Listen("tcp", bindAddr,
                                         &amp;tls.Config{
                                                 Certificates: []tls.Certificate{*cert},
@@ -480,73 +491,73 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
                                         },
                                 )
                         }</span>
-                } else<span class="cov8" title="1"> {
-                        if bindAddr, err = normalizeListenAddr(listenAddr, "80", "8080"); err == nil </span><span class="cov8" title="1">{
+                } else<span class="cov7" title="12"> {
+                        if bindAddr, err = normalizeListenAddr(listenAddr, "80", "8080"); err == nil </span><span class="cov6" title="9">{
                                 l, err = net.Listen("tcp", bindAddr)
                         }</span>
                 }
-                <span class="cov8" title="1">if l != nil </span><span class="cov8" title="1">{
-                        if listenUrl = overrideUrl; listenUrl == "" </span><span class="cov8" title="1">{
+                <span class="cov8" title="18">if l != nil </span><span class="cov7" title="13">{
+                        if listenUrl = overrideUrl; listenUrl == "" </span><span class="cov7" title="13">{
                                 listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenUrlString(l, cert))
                         }</span>
                 }
         }
-        <span class="cov8" title="1">return</span>
+        <span class="cov8" title="19">return</span>
 }
 
-func normalizeListenAddr(address, defaultpriv, defaultother string) (result string, err error) <span class="cov8" title="1">{
-        if _, _, err = net.SplitHostPort(address); err == nil </span><span class="cov8" title="1">{
+func normalizeListenAddr(address, defaultpriv, defaultother string) (result string, err error) <span class="cov10" title="28">{
+        if _, _, err = net.SplitHostPort(address); err == nil </span><span class="cov8" title="15">{
                 // host and port both present
-                if strings.HasPrefix(address, "[]") </span><span class="cov8" title="1">{
+                if strings.HasPrefix(address, "[]") </span><span class="cov4" title="4">{
                         err = net.InvalidAddrError(address)
-                }</span> else<span class="cov8" title="1"> {
+                }</span> else<span class="cov7" title="11"> {
                         result = address
                 }</span>
-                <span class="cov8" title="1">return</span>
+                <span class="cov8" title="15">return</span>
         }
 
-        <span class="cov8" title="1">err = nil
+        <span class="cov7" title="13">err = nil
         defaultPort := defaultpriv
-        if os.Geteuid() &gt; 0 </span><span class="cov8" title="1">{
+        if os.Geteuid() &gt; 0 </span><span class="cov7" title="13">{
                 defaultPort = defaultother
         }</span>
 
-        <span class="cov8" title="1">result = address
-        if strings.HasPrefix(address, "[") </span><span class="cov8" title="1">{
-                if len(address) &gt; 2 &amp;&amp; strings.HasSuffix(address, "]") </span><span class="cov8" title="1">{
+        <span class="cov7" title="13">result = address
+        if strings.HasPrefix(address, "[") </span><span class="cov5" title="6">{
+                if len(address) &gt; 2 &amp;&amp; strings.HasSuffix(address, "]") </span><span class="cov1" title="1">{
                         result = address[1 : len(address)-1]
-                }</span> else<span class="cov8" title="1"> {
+                }</span> else<span class="cov5" title="5"> {
                         result = ""
                         err = net.InvalidAddrError(address)
                 }</span>
         }
-        <span class="cov8" title="1">if err == nil </span><span class="cov8" title="1">{
+        <span class="cov7" title="13">if err == nil </span><span class="cov6" title="8">{
                 result = net.JoinHostPort(result, defaultPort)
         }</span>
-        <span class="cov8" title="1">return</span>
+        <span class="cov7" title="13">return</span>
 }
 
-func localhostOrDNSName(cert *tls.Certificate) string <span class="cov8" title="1">{
-        if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span><span class="cov8" title="1">{
+func localhostOrDNSName(cert *tls.Certificate) string <span class="cov7" title="13">{
+        if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span><span class="cov5" title="6">{
                 name := cert.Leaf.DNSNames[0]
-                if host, _, err := net.SplitHostPort(name); err == nil </span><span class="cov8" title="1">{
+                if host, _, err := net.SplitHostPort(name); err == nil </span><span class="cov5" title="6">{
                         name = host
                 }</span>
-                <span class="cov8" title="1">return name</span>
+                <span class="cov5" title="6">return name</span>
         }
-        <span class="cov8" title="1">return "localhost"</span>
+        <span class="cov6" title="7">return "localhost"</span>
 }
 
-func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) <span class="cov8" title="1">{
+func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) <span class="cov7" title="13">{
         addr = l.Addr().String()
-        if host, port, err := net.SplitHostPort(addr); err == nil </span><span class="cov8" title="1">{
-                if ip := net.ParseIP(host); ip != nil </span><span class="cov8" title="1">{
-                        if ip.IsUnspecified() || ip.IsLoopback() </span><span class="cov8" title="1">{
+        if host, port, err := net.SplitHostPort(addr); err == nil </span><span class="cov7" title="13">{
+                if ip := net.ParseIP(host); ip != nil </span><span class="cov7" title="13">{
+                        if ip.IsUnspecified() || ip.IsLoopback() </span><span class="cov7" title="13">{
                                 addr = net.JoinHostPort(localhostOrDNSName(cert), port)
                         }</span>
                 }
         }
-        <span class="cov8" title="1">return</span>
+        <span class="cov7" title="13">return</span>
 }
 </pre>
 		
@@ -571,25 +582,25 @@ import (
 // If privkeyPem is empty, it defaults to "privkey.pem".
 //
 // Return a non-nil cert and absolute path to certDir if there are no errors.
-func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, absCertDir string, err error) <span class="cov8" title="1">{
-        if certDir != "" </span><span class="cov8" title="1">{
+func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, absCertDir string, err error) <span class="cov10" title="22">{
+        if certDir != "" </span><span class="cov7" title="9">{
                 certDir = os.ExpandEnv(certDir)
-                if absCertDir, err = filepath.Abs(certDir); err == nil </span><span class="cov8" title="1">{
+                if absCertDir, err = filepath.Abs(certDir); err == nil </span><span class="cov7" title="9">{
                         var cer tls.Certificate
-                        if fullchainPem == "" </span><span class="cov8" title="1">{
+                        if fullchainPem == "" </span><span class="cov7" title="8">{
                                 fullchainPem = FullchainPem
                         }</span>
-                        <span class="cov8" title="1">if privkeyPem == "" </span><span class="cov8" title="1">{
+                        <span class="cov7" title="9">if privkeyPem == "" </span><span class="cov7" title="8">{
                                 privkeyPem = PrivkeyPem
                         }</span>
-                        <span class="cov8" title="1">fc := filepath.Join(absCertDir, fullchainPem)
+                        <span class="cov7" title="9">fc := filepath.Join(absCertDir, fullchainPem)
                         pk := filepath.Join(absCertDir, privkeyPem)
-                        if cer, err = tls.LoadX509KeyPair(fc, pk); err == nil </span><span class="cov8" title="1">{
+                        if cer, err = tls.LoadX509KeyPair(fc, pk); err == nil </span><span class="cov7" title="8">{
                                 cert = &amp;cer
                         }</span>
                 }
         }
-        <span class="cov8" title="1">return</span>
+        <span class="cov10" title="22">return</span>
 }
 </pre>
 		
@@ -611,20 +622,20 @@ import (
 // dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
 // They are not confined to UserConfigDir, so they may resolve outside of it.
 // Caller is responsible for validating or sandboxing untrusted path input.
-func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <span class="cov8" title="1">{
+func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <span class="cov10" title="10">{
         result = dataDir
-        if result == "" </span><span class="cov8" title="1">{
-                if defaultSuffix != "" </span><span class="cov8" title="1">{
-                        if result, err = os.UserConfigDir(); err == nil </span><span class="cov8" title="1">{
+        if result == "" </span><span class="cov8" title="7">{
+                if defaultSuffix != "" </span><span class="cov3" title="2">{
+                        if result, err = os.UserConfigDir(); err == nil </span><span class="cov3" title="2">{
                                 result = filepath.Join(result, defaultSuffix)
                         }</span>
                 }
         }
-        <span class="cov8" title="1">if err == nil &amp;&amp; result != "" </span><span class="cov8" title="1">{
+        <span class="cov10" title="10">if err == nil &amp;&amp; result != "" </span><span class="cov7" title="5">{
                 result = os.ExpandEnv(result)
                 result, err = filepath.Abs(result)
         }</span>
-        <span class="cov8" title="1">return</span>
+        <span class="cov10" title="10">return</span>
 }
 
 // UseDataDir transforms dataDir into an absolute path. Then, if mode
@@ -632,16 +643,16 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <s
 // if dataDir is empty. Does not expand environment variables in the path.
 //
 // Returns the final path or an empty string if dataDir was empty.
-func UseDataDir(dataDir string, mode fs.FileMode) (string, error) <span class="cov8" title="1">{
+func UseDataDir(dataDir string, mode fs.FileMode) (string, error) <span class="cov9" title="8">{
         var err error
-        if dataDir != "" </span><span class="cov8" title="1">{
-                if dataDir, err = filepath.Abs(dataDir); err == nil </span><span class="cov8" title="1">{
-                        if mode != 0 </span><span class="cov8" title="1">{
+        if dataDir != "" </span><span class="cov6" title="4">{
+                if dataDir, err = filepath.Abs(dataDir); err == nil </span><span class="cov6" title="4">{
+                        if mode != 0 </span><span class="cov5" title="3">{
                                 err = os.MkdirAll(dataDir, mode)
                         }</span>
                 }
         }
-        <span class="cov8" title="1">return dataDir, err</span>
+        <span class="cov9" title="8">return dataDir, err</span>
 }
 </pre>
 		
