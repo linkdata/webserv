@@ -33,6 +33,20 @@ type notifyingLogger struct {
 	once   sync.Once
 }
 
+type panicListener struct{}
+
+func (panicListener) Accept() (net.Conn, error) {
+	panic(errors.New("accept panic"))
+}
+
+func (panicListener) Close() error {
+	return nil
+}
+
+func (panicListener) Addr() net.Addr {
+	return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)}
+}
+
 func newNotifyingLogger(w io.Writer, match string) *notifyingLogger {
 	return &notifyingLogger{
 		logger: slog.New(slog.NewTextHandler(w, nil)),
@@ -324,15 +338,32 @@ func TestConfigServeWith_NilListenerPanics(t *testing.T) {
 	_ = cfg.ServeWith(ctx, srv, nil)
 }
 
-func TestConfigServeWith_NilServerReturnsRecoveredPanicError(t *testing.T) {
+func TestConfigServeWith_NilServerPanics(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
 
+	panicked := false
+	defer func() {
+		if r := recover(); r != nil {
+			panicked = true
+		}
+		if !panicked {
+			t.Fatal("expected ServeWith() to panic for nil server")
+		}
+	}()
+
 	cfg := &webserv.Config{}
-	err = cfg.ServeWith(t.Context(), nil, l)
+	_ = cfg.ServeWith(t.Context(), nil, l)
+}
+
+func TestConfigServeWith_RecoversServePanic(t *testing.T) {
+	cfg := &webserv.Config{}
+	srv := &http.Server{}
+
+	err := cfg.ServeWith(t.Context(), srv, panicListener{})
 	if err == nil {
 		t.Fatal("expected ServeWith() error")
 	}

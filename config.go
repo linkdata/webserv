@@ -94,9 +94,12 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 //
 // Returns nil if the server started successfully and then cleanly shut down.
 //
-// Panics if ctx or l is nil. Panics from srv.Serve, including a nil srv, are
-// recovered and returned as an error matching ErrServePanic.
+// Panics if ctx, srv or l is nil. Panics from srv.Serve are recovered and
+// returned as an error matching ErrServePanic.
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) {
+	if srv == nil {
+		panic("webserv: nil http.Server")
+	}
 	serveErr := make(chan error, 1)
 	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
