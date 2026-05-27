@@ -48,9 +48,9 @@ func TestUseDataDir(t *testing.T) {
 }
 
 func TestUseDataDir_DoesNotDoubleExpandEnv(t *testing.T) {
-	// Bug: DefaultDataDir already calls os.ExpandEnv, then UseDataDir
-	// calls os.ExpandEnv again. If the path contains a literal '$' after
-	// the first expansion, the second expansion misinterprets it.
+	// Regression: DefaultDataDir already calls os.ExpandEnv, and UseDataDir
+	// used to call os.ExpandEnv again. If the path contained a literal '$'
+	// after the first expansion, the second expansion misinterpreted it.
 	dir := t.TempDir()
 	// UseDataDir should not expand an already-absolute path further.
 	// A literal "$" in the path should survive unchanged.
