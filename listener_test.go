@@ -1,10 +1,13 @@
 package webserv_test
 
 import (
+	"crypto/tls"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/linkdata/webserv"
 )
@@ -150,4 +153,54 @@ func TestListener_MalformedBracketHostRejected(t *testing.T) {
 			t.Fatalf("expected malformed listen address %q to fail, got listener on %q", listenAddr, addr)
 		}
 	}
+}
+
+func TestListener_TLSAdvertisesHTTP2(t *testing.T) {
+	withCertFiles(t, func(destdir string) {
+		l, _, _, err := webserv.Listener("127.0.0.1:0", destdir, "", "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = l.Close() }()
+
+		acceptDone := make(chan error, 1)
+		go func() {
+			var conn net.Conn
+			var err error
+			if conn, err = l.Accept(); err == nil {
+				defer func() { _ = conn.Close() }()
+				if err = conn.SetDeadline(time.Now().Add(time.Second)); err == nil {
+					var tlsConn *tls.Conn
+					var ok bool
+					if tlsConn, ok = conn.(*tls.Conn); ok {
+						err = tlsConn.Handshake()
+					} else {
+						err = errors.New("accepted connection is not TLS")
+					}
+				}
+			}
+			acceptDone <- err
+		}()
+
+		dialer := &net.Dialer{
+			Timeout: time.Second,
+		}
+		conn, err := tls.DialWithDialer(dialer, "tcp", l.Addr().String(), &tls.Config{
+			InsecureSkipVerify: true,
+			NextProtos:         []string{"h2", "http/1.1"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		state := conn.ConnectionState()
+		if err = conn.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err = <-acceptDone; err != nil {
+			t.Fatal(err)
+		}
+		if state.NegotiatedProtocol != "h2" {
+			t.Fatalf("negotiated protocol = %q, want %q", state.NegotiatedProtocol, "h2")
+		}
+	})
 }

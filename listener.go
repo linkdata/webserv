@@ -40,6 +40,7 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 					&tls.Config{
 						Certificates: []tls.Certificate{*cert},
 						MinVersion:   tls.VersionTLS13,
+						NextProtos:   []string{"h2", "http/1.1"},
 					},
 				)
 			}
@@ -69,10 +70,7 @@ func normalizeListenAddr(address, defaultpriv, defaultother string) (result stri
 	}
 
 	err = nil
-	defaultPort := defaultpriv
-	if os.Geteuid() > 0 {
-		defaultPort = defaultother
-	}
+	defaultPort := defaultListenPort(os.Geteuid(), defaultpriv, defaultother)
 
 	result = address
 	if strings.HasPrefix(address, "[") {
@@ -85,6 +83,14 @@ func normalizeListenAddr(address, defaultpriv, defaultother string) (result stri
 	}
 	if err == nil {
 		result = net.JoinHostPort(result, defaultPort)
+	}
+	return
+}
+
+func defaultListenPort(euid int, defaultpriv, defaultother string) (port string) {
+	port = defaultother
+	if euid == 0 {
+		port = defaultpriv
 	}
 	return
 }
