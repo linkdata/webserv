@@ -142,6 +142,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 		if reason = context.Cause(ctx); reason == nil {
 			reason = context.Cause(sigCtx)
 		}
+		stop()
 		cfg.logInfo("stopped", "reason", reason)
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.shutdownTimeLimit())
 		shutdownErr := srv.Shutdown(shutdownCtx)
