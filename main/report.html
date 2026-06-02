@@ -130,7 +130,7 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) <span class="cov5"
 // It sets the GID, UID and changes the USER and HOME
 // environment variables accordingly. It unsets XDG_CONFIG_HOME.
 //
-// Returns an error matching ErrBecomeUser on failure.
+// Returns an error matching [ErrBecomeUser] on failure.
 func BecomeUser(userName string) error <span class="cov10" title="16">{
         var err error
         if userName != "" </span><span class="cov8" title="11">{
@@ -187,9 +187,9 @@ const defaultShutdownTimeLimit = time.Second
 
 // Config contains the startup and serving settings for a simple web service.
 //
-// The zero value is usable: Listen serves HTTP on the default address and port,
-// Serve uses a default http.Server, no user switch or data directory setup is
-// performed, and no logs are emitted.
+// The zero value is usable: [Config.Listen] serves HTTP on the default address
+// and port, [Config.Serve] uses a default [net/http.Server], no user switch or
+// data directory setup is performed, and no logs are emitted.
 type Config struct {
         Address              string        // optional specific address to listen on; use ":port" for port-only
         CertDir              string        // if set, directory to look for fullchain.pem and privkey.pem
@@ -198,7 +198,7 @@ type Config struct {
         User                 string        // if set, user to switch to after opening listening port
         DataDir              string        // if set, the data directory to use (created only when DataDirMode is nonzero); if unset, may be filled in after Listen
         DefaultDataDirSuffix string        // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
-        DataDirMode          fs.FileMode   // if nonzero, create DataDir if it does not exist using this mode
+        DataDirMode          fs.FileMode   // if nonzero, create DataDir if it does not exist using this mode (subject to the process umask, like os.MkdirAll)
         ListenURL            string        // if set, the external URL clients can reach us at. If unset, Listen may fill this in (e.g. "https://localhost:8443"), even when Listen later returns an error after binding.
         ShutdownTimeLimit    time.Duration // maximum time ServeWith waits for graceful shutdown; zero uses a 1 second default
         LogTLSErrors         bool          // if set, http.Server TLS handshake error messages are not filtered
@@ -219,20 +219,21 @@ func (cfg *Config) shutdownTimeLimit() (limit time.Duration) <span class="cov6" 
 }
 
 // Listen performs initial setup for a simple web server and returns a
-// net.Listener if successful.
+// [net.Listener] if successful.
 //
-// First it loads certificates if cfg.CertDir is set, and then starts a net.Listener
+// First it loads certificates if cfg.CertDir is set, and then starts a [net.Listener]
 // (TLS or normal). The listener will default to all addresses and standard port
 // depending on privileges and if a certificate was loaded or not.
 //
 // If cfg.Address was set, any address or port given there overrides these defaults.
 //
-// If cfg.User is set it then switches to that user and the users primary group.
-// Note that this is not supported on Windows.
+// If cfg.User is set it then switches to that user and the users primary group
+// using [BecomeUser]. Note that this is not supported on Windows.
 //
 // If cfg.DataDir or cfg.DefaultDataDirSuffix is set, calculates the absolute
-// data directory path and sets cfg.DataDir. If cfg.DataDirMode is nonzero, the
-// directory will be created if necessary.
+// data directory path with [DefaultDataDir] and sets cfg.DataDir. If
+// cfg.DataDirMode is nonzero, [UseDataDir] creates the directory if necessary,
+// using cfg.DataDirMode subject to the process umask.
 //
 // On return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
 // If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
@@ -267,15 +268,20 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov7" title
         <span class="cov7" title="10">return</span>
 }
 
-// ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls srv.Serve(l).
-// If ctx is canceled, the server will be shut down and this function returns with ctx.Err().
+// ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls
+// srv.Serve(l). If ctx is canceled, the server is shut down with
+// [net/http.Server.Shutdown] and this function returns with ctx.Err().
 //
 // Returns nil if the server started successfully and then cleanly shut down.
-// Graceful shutdown waits for cfg.ShutdownTimeLimit, or 1 second when
-// cfg.ShutdownTimeLimit is zero.
+// Graceful shutdown waits for [Config.ShutdownTimeLimit], or 1 second when
+// [Config.ShutdownTimeLimit] is zero.
+//
+// Unless [Config.LogTLSErrors] is set, srv.ErrorLog is replaced for the lifetime
+// of the call with a filter that drops TLS handshake error lines and forwards
+// the rest; the original logger is not restored.
 //
 // Panics if ctx, srv or l is nil. Panics from srv.Serve are recovered and
-// returned as an error matching ErrServePanic.
+// returned as an error matching [ErrServePanic].
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov7" title="11">{
         if ctx == nil </span><span class="cov1" title="1">{
                 panic("webserv: nil context.Context")</span>
@@ -289,21 +295,19 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
         <span class="cov6" title="8">serveErr := make(chan error, 1)
         sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
         defer stop()
-        cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
+        if !cfg.LogTLSErrors </span><span class="cov6" title="7">{
+                // Install the filter before serving so the single write to
+                // srv.ErrorLog happens-before any connection goroutine reads it.
+                installTLSErrorLogFilter(srv)
+        }</span>
+        <span class="cov6" title="8">cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
         go func() </span><span class="cov6" title="8">{
                 defer func() </span><span class="cov6" title="8">{
                         if p := recover(); p != nil </span><span class="cov1" title="1">{
                                 serveErr &lt;- newErrServePanic(p)
                         }</span>
                 }()
-                <span class="cov6" title="8">serveErr &lt;- func() (err error) </span><span class="cov6" title="8">{
-                        if !cfg.LogTLSErrors </span><span class="cov6" title="7">{
-                                restore := filterTLSErrorLog(srv)
-                                defer restore()
-                        }</span>
-                        <span class="cov6" title="8">err = srv.Serve(l)
-                        return</span>
-                }()
+                <span class="cov6" title="8">serveErr &lt;- srv.Serve(l)</span>
         }()
         <span class="cov6" title="8">select </span>{
         case err = &lt;-serveErr:<span class="cov4" title="4"></span>
@@ -333,11 +337,12 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
         <span class="cov6" title="8">return err</span>
 }
 
-// Serve creates an http.Server with reasonable defaults and calls ServeWith.
+// Serve creates an [net/http.Server] with reasonable defaults and calls
+// [Config.ServeWith].
 //
-// The server uses handler as its Handler; if handler is nil, http.DefaultServeMux
-// is used by net/http. ReadHeaderTimeout is set to 5 seconds and IdleTimeout is
-// set to 1 minute.
+// The server uses handler as its Handler; if handler is nil,
+// [net/http.DefaultServeMux] is used by net/http. ReadHeaderTimeout is set to 5
+// seconds and IdleTimeout is set to 1 minute.
 //
 // Serve takes ownership of l for serving. It returns nil after a clean shutdown,
 // returns ctx.Err() when ctx cancellation starts shutdown, and otherwise returns
@@ -353,11 +358,11 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
         return cfg.ServeWith(ctx, srv, l)
 }</span>
 
-// ListenAndServe calls Listen followed by Serve.
+// ListenAndServe calls [Config.Listen] followed by [Config.Serve].
 //
 // It returns ctx.Err() without opening a listener if ctx is already canceled.
-// Otherwise, it performs the setup documented by Listen and then serves requests
-// with the default server settings documented by Serve.
+// Otherwise, it performs the setup documented by [Config.Listen] and then serves
+// requests with the default server settings documented by [Config.Serve].
 //
 // The returned error is from Listen, Serve, ctx cancellation, or shutdown. A nil
 // return means the server started successfully and then shut down cleanly.
@@ -383,7 +388,7 @@ type errBecomeUser struct {
         err      error
 }
 
-// ErrBecomeUser matches errors returned by BecomeUser on failure.
+// ErrBecomeUser matches errors returned by [BecomeUser] on failure.
 var ErrBecomeUser = errBecomeUser{}
 
 func (e errBecomeUser) Error() string <span class="cov3" title="2">{
@@ -438,13 +443,17 @@ func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov8"
         <span class="cov8" title="5">return</span>
 }
 
-func filterTLSErrorLog(srv *http.Server) (restore func()) <span class="cov10" title="7">{
-        previous := srv.ErrorLog
-        srv.ErrorLog = log.New(tlsErrorLogWriter{previous: previous}, "", 0)
-        return func() </span><span class="cov10" title="7">{
-                srv.ErrorLog = previous
-        }</span>
-}
+// installTLSErrorLogFilter wraps srv.ErrorLog so that "http: TLS handshake
+// error" lines are dropped while all other output is forwarded to the previous
+// [net/http.Server.ErrorLog] (or the standard logger if it was nil).
+//
+// It performs a single write to srv.ErrorLog and must be called before
+// [net/http.Server.Serve] starts. Doing so orders the write before every
+// connection goroutine that later reads srv.ErrorLog, so the filter is never
+// mutated again while connections are being served or drained.
+func installTLSErrorLogFilter(srv *http.Server) <span class="cov10" title="7">{
+        srv.ErrorLog = log.New(tlsErrorLogWriter{previous: srv.ErrorLog}, "", 0)
+}</span>
 </pre>
 		
 		<pre class="file" id="file4" style="display: none">package webserv
@@ -456,7 +465,7 @@ type errServePanic struct {
         err       error
 }
 
-// ErrServePanic matches errors returned by ServeWith when srv.Serve panics.
+// ErrServePanic matches errors returned by [Config.ServeWith] when srv.Serve panics.
 var ErrServePanic = errServePanic{}
 
 func (e errServePanic) Error() string <span class="cov4" title="2">{
@@ -501,10 +510,10 @@ const (
         PrivkeyPem = "privkey.pem"
 )
 
-// Listener creates a net.Listener given an optional preferred address
+// Listener creates a [net.Listener] given an optional preferred address
 // and an optional directory containing certificate files.
 //
-// If certDir is not empty, it calls LoadCert to load fullchain.pem and privkey.pem.
+// If certDir is not empty, it calls [LoadCert] to load fullchain.pem and privkey.pem.
 //
 // The listener will default to all addresses and standard port
 // depending on privileges and if a certificate was loaded or not.
@@ -512,8 +521,9 @@ const (
 // These defaults can be overridden with the listenAddr argument.
 // To specify only a port, use an address like ":8080".
 //
-// Returns the net.Listener and listenURL if there was no error.
-// If certificates were successfully loaded, absCertDir will be the absolute path to that directory.
+// Returns the [net.Listener] and listenURL if there was no error.
+// absCertDir is the resolved absolute path to certDir whenever certDir was
+// non-empty and could be resolved, even if loading the certificate then failed.
 func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) <span class="cov9" title="20">{
         var cert *tls.Certificate
         if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil </span><span class="cov8" title="19">{
@@ -615,17 +625,19 @@ import (
 
 // LoadCert does nothing if certDir is empty, otherwise it expands
 // environment variables and transforms it into an absolute path.
-// It then tries to load a X509 key pair from the files named fullchainPem
-// and privkeyPem from the resulting directory.
+// It then tries to load a X509 key pair with [crypto/tls.LoadX509KeyPair] from
+// the files named fullchainPem and privkeyPem in the resulting directory.
 //
 // The filenames may contain paths, ".." segments and symlinks.
 // They are not confined to certDir, so they may resolve outside of it.
 // Caller is responsible for validating or sandboxing untrusted path input.
 //
-// If fullchainPem is empty, it defaults to "fullchain.pem".
-// If privkeyPem is empty, it defaults to "privkey.pem".
+// If fullchainPem is empty, it defaults to [FullchainPem].
+// If privkeyPem is empty, it defaults to [PrivkeyPem].
 //
-// Return a non-nil cert and absolute path to certDir if there are no errors.
+// cert is non-nil only when the key pair loaded successfully. absCertDir is the
+// resolved absolute directory whenever certDir was non-empty and [path/filepath.Abs]
+// succeeded, regardless of whether the key pair then loaded.
 func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, absCertDir string, err error) <span class="cov10" title="23">{
         if certDir != "" </span><span class="cov7" title="10">{
                 certDir = os.ExpandEnv(certDir)
@@ -658,14 +670,15 @@ import (
 
 // DefaultDataDir returns the absolute path to dataDir if not empty, otherwise if
 // defaultSuffix is not empty it returns the absolute joined path
-// of os.UserConfigDir() and defaultSuffix.
+// of [os.UserConfigDir] and defaultSuffix.
 //
 // It will expand environment variables in the path before evaluating the
 // absolute path.
 //
 // dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
-// They are not confined to UserConfigDir, so they may resolve outside of it.
-// Caller is responsible for validating or sandboxing untrusted path input.
+// They are not confined to the user config directory, so they may resolve
+// outside of it. Caller is responsible for validating or sandboxing untrusted
+// path input.
 func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <span class="cov10" title="10">{
         result = dataDir
         if result == "" </span><span class="cov8" title="7">{
@@ -683,8 +696,10 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <s
 }
 
 // UseDataDir transforms dataDir into an absolute path. Then, if mode
-// is not zero, it creates the path if it does not exist. Does nothing
-// if dataDir is empty. Does not expand environment variables in the path.
+// is not zero, it creates the path if it does not exist using [os.MkdirAll].
+// As with [os.MkdirAll], mode is subject to the process umask, so the created
+// directory's permissions may be more restrictive than mode. Does nothing if
+// dataDir is empty. Does not expand environment variables in the path.
 //
 // Returns the final path or an empty string if dataDir was empty.
 func UseDataDir(dataDir string, mode fs.FileMode) (string, error) <span class="cov9" title="8">{
