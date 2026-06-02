@@ -8,11 +8,9 @@ import (
 )
 
 func TestLoadCert_UsesFilepathJoinNotPathJoin(t *testing.T) {
-	// Regression: LoadCert used to use path.Join (POSIX) instead of
-	// filepath.Join (OS-aware). On Windows, path.Join produces forward-slash
-	// paths which may not work correctly.
-	// We verify that the resulting paths use OS-appropriate separators by checking
-	// that LoadCert does not fail for a directory with cert files in a subdirectory.
+	// LoadCert joins paths with filepath.Join so OS-appropriate separators are
+	// used: relative components such as "sub/.." resolve correctly and the key
+	// pair still loads.
 	withCertFiles(t, func(destdir string) {
 		// Create a subdirectory to force path joining
 		subdir := filepath.Join(destdir, "sub")
