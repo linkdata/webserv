@@ -7,7 +7,7 @@ type errServePanic struct {
 	err       error
 }
 
-// ErrServePanic matches errors returned by ServeWith when srv.Serve panics.
+// ErrServePanic matches errors returned by [Config.ServeWith] when srv.Serve panics.
 var ErrServePanic = errServePanic{}
 
 func (e errServePanic) Error() string {
