@@ -36,7 +36,7 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) {
 // It sets the GID, UID and changes the USER and HOME
 // environment variables accordingly. It unsets XDG_CONFIG_HOME.
 //
-// Returns an error matching ErrBecomeUser on failure.
+// Returns an error matching [ErrBecomeUser] on failure.
 func BecomeUser(userName string) error {
 	var err error
 	if userName != "" {

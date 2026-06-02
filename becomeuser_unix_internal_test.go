@@ -208,9 +208,8 @@ func TestGroupIDsFn_DefaultImplementation(t *testing.T) {
 }
 
 func TestParseGroupIDs_ErrorBeforeValidEntryIsNotSilentlyDropped(t *testing.T) {
-	// Regression: parseGroupIDs used to continue the loop after a parse
-	// error, so a subsequent successful parse overwrote err with nil.
-	// e.g. ["bad", "201"] should return an error, not ([201], nil).
+	// A parse error must be reported even when a later entry parses cleanly:
+	// ["bad", "201"] returns an error, not ([201], nil).
 	gids, err := parseGroupIDs([]string{"bad", "201"})
 	if err == nil {
 		t.Fatalf("expected error for invalid group ID, got gids=%v", gids)
