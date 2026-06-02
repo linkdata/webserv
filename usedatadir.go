@@ -8,14 +8,15 @@ import (
 
 // DefaultDataDir returns the absolute path to dataDir if not empty, otherwise if
 // defaultSuffix is not empty it returns the absolute joined path
-// of os.UserConfigDir() and defaultSuffix.
+// of [os.UserConfigDir] and defaultSuffix.
 //
 // It will expand environment variables in the path before evaluating the
 // absolute path.
 //
 // dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
-// They are not confined to UserConfigDir, so they may resolve outside of it.
-// Caller is responsible for validating or sandboxing untrusted path input.
+// They are not confined to the user config directory, so they may resolve
+// outside of it. Caller is responsible for validating or sandboxing untrusted
+// path input.
 func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) {
 	result = dataDir
 	if result == "" {
@@ -33,8 +34,10 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) {
 }
 
 // UseDataDir transforms dataDir into an absolute path. Then, if mode
-// is not zero, it creates the path if it does not exist. Does nothing
-// if dataDir is empty. Does not expand environment variables in the path.
+// is not zero, it creates the path if it does not exist using [os.MkdirAll].
+// As with [os.MkdirAll], mode is subject to the process umask, so the created
+// directory's permissions may be more restrictive than mode. Does nothing if
+// dataDir is empty. Does not expand environment variables in the path.
 //
 // Returns the final path or an empty string if dataDir was empty.
 func UseDataDir(dataDir string, mode fs.FileMode) (string, error) {
