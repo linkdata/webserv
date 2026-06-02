@@ -15,10 +15,10 @@ const (
 	PrivkeyPem = "privkey.pem"
 )
 
-// Listener creates a net.Listener given an optional preferred address
+// Listener creates a [net.Listener] given an optional preferred address
 // and an optional directory containing certificate files.
 //
-// If certDir is not empty, it calls LoadCert to load fullchain.pem and privkey.pem.
+// If certDir is not empty, it calls [LoadCert] to load fullchain.pem and privkey.pem.
 //
 // The listener will default to all addresses and standard port
 // depending on privileges and if a certificate was loaded or not.
@@ -26,8 +26,9 @@ const (
 // These defaults can be overridden with the listenAddr argument.
 // To specify only a port, use an address like ":8080".
 //
-// Returns the net.Listener and listenURL if there was no error.
-// If certificates were successfully loaded, absCertDir will be the absolute path to that directory.
+// Returns the [net.Listener] and listenURL if there was no error.
+// absCertDir is the resolved absolute path to certDir whenever certDir was
+// non-empty and could be resolved, even if loading the certificate then failed.
 func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) {
 	var cert *tls.Certificate
 	if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil {

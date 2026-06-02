@@ -51,9 +51,8 @@ func TestNormalizeListenAddr_MalformedBracketHostRejected(t *testing.T) {
 }
 
 func TestNormalizeListenAddr_MalformedBracketResultIsEmpty(t *testing.T) {
-	// Regression: normalizeListenAddr used to fall through to net.JoinHostPort
-	// on the bracket-validation error path, returning a non-empty result
-	// (e.g. ":8080") alongside the error.
+	// A malformed bracket address must return an empty result alongside the
+	// error, never a usable address such as ":8080".
 	for _, in := range []string{"[]", "[::1"} {
 		got, err := normalizeListenAddr(in, "80", "8080")
 		if err == nil {
@@ -78,7 +77,8 @@ func TestDefaultListenPort_NonRootUsesOtherDefault(t *testing.T) {
 }
 
 func TestDefaultListenPort_NegativeEUIDUsesOtherDefault(t *testing.T) {
-	// Regression: os.Geteuid returns -1 on Windows, which is not root.
+	// A negative euid (such as the -1 os.Geteuid returns on Windows) is not
+	// root and must use the unprivileged default port.
 	if got := defaultListenPort(-1, "80", "8080"); got != "8080" {
 		t.Fatalf("defaultListenPort(-1) = %q, want %q", got, "8080")
 	}
