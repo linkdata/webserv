@@ -29,10 +29,14 @@ func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) {
 	return
 }
 
-func filterTLSErrorLog(srv *http.Server) (restore func()) {
-	previous := srv.ErrorLog
-	srv.ErrorLog = log.New(tlsErrorLogWriter{previous: previous}, "", 0)
-	return func() {
-		srv.ErrorLog = previous
-	}
+// installTLSErrorLogFilter wraps srv.ErrorLog so that "http: TLS handshake
+// error" lines are dropped while all other output is forwarded to the previous
+// [net/http.Server.ErrorLog] (or the standard logger if it was nil).
+//
+// It performs a single write to srv.ErrorLog and must be called before
+// [net/http.Server.Serve] starts. Doing so orders the write before every
+// connection goroutine that later reads srv.ErrorLog, so the filter is never
+// mutated again while connections are being served or drained.
+func installTLSErrorLogFilter(srv *http.Server) {
+	srv.ErrorLog = log.New(tlsErrorLogWriter{previous: srv.ErrorLog}, "", 0)
 }
