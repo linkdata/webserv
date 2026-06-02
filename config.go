@@ -16,9 +16,9 @@ const defaultShutdownTimeLimit = time.Second
 
 // Config contains the startup and serving settings for a simple web service.
 //
-// The zero value is usable: Listen serves HTTP on the default address and port,
-// Serve uses a default http.Server, no user switch or data directory setup is
-// performed, and no logs are emitted.
+// The zero value is usable: [Config.Listen] serves HTTP on the default address
+// and port, [Config.Serve] uses a default [net/http.Server], no user switch or
+// data directory setup is performed, and no logs are emitted.
 type Config struct {
 	Address              string        // optional specific address to listen on; use ":port" for port-only
 	CertDir              string        // if set, directory to look for fullchain.pem and privkey.pem
@@ -27,7 +27,7 @@ type Config struct {
 	User                 string        // if set, user to switch to after opening listening port
 	DataDir              string        // if set, the data directory to use (created only when DataDirMode is nonzero); if unset, may be filled in after Listen
 	DefaultDataDirSuffix string        // if set and DataDir is not set, set DataDir to the user's default data dir plus this suffix
-	DataDirMode          fs.FileMode   // if nonzero, create DataDir if it does not exist using this mode
+	DataDirMode          fs.FileMode   // if nonzero, create DataDir if it does not exist using this mode (subject to the process umask, like os.MkdirAll)
 	ListenURL            string        // if set, the external URL clients can reach us at. If unset, Listen may fill this in (e.g. "https://localhost:8443"), even when Listen later returns an error after binding.
 	ShutdownTimeLimit    time.Duration // maximum time ServeWith waits for graceful shutdown; zero uses a 1 second default
 	LogTLSErrors         bool          // if set, http.Server TLS handshake error messages are not filtered
@@ -48,20 +48,21 @@ func (cfg *Config) shutdownTimeLimit() (limit time.Duration) {
 }
 
 // Listen performs initial setup for a simple web server and returns a
-// net.Listener if successful.
+// [net.Listener] if successful.
 //
-// First it loads certificates if cfg.CertDir is set, and then starts a net.Listener
+// First it loads certificates if cfg.CertDir is set, and then starts a [net.Listener]
 // (TLS or normal). The listener will default to all addresses and standard port
 // depending on privileges and if a certificate was loaded or not.
 //
 // If cfg.Address was set, any address or port given there overrides these defaults.
 //
-// If cfg.User is set it then switches to that user and the users primary group.
-// Note that this is not supported on Windows.
+// If cfg.User is set it then switches to that user and the users primary group
+// using [BecomeUser]. Note that this is not supported on Windows.
 //
 // If cfg.DataDir or cfg.DefaultDataDirSuffix is set, calculates the absolute
-// data directory path and sets cfg.DataDir. If cfg.DataDirMode is nonzero, the
-// directory will be created if necessary.
+// data directory path with [DefaultDataDir] and sets cfg.DataDir. If
+// cfg.DataDirMode is nonzero, [UseDataDir] creates the directory if necessary,
+// using cfg.DataDirMode subject to the process umask.
 //
 // On return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
 // If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
@@ -96,15 +97,20 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 	return
 }
 
-// ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls srv.Serve(l).
-// If ctx is canceled, the server will be shut down and this function returns with ctx.Err().
+// ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls
+// srv.Serve(l). If ctx is canceled, the server is shut down with
+// [net/http.Server.Shutdown] and this function returns with ctx.Err().
 //
 // Returns nil if the server started successfully and then cleanly shut down.
-// Graceful shutdown waits for cfg.ShutdownTimeLimit, or 1 second when
-// cfg.ShutdownTimeLimit is zero.
+// Graceful shutdown waits for [Config.ShutdownTimeLimit], or 1 second when
+// [Config.ShutdownTimeLimit] is zero.
+//
+// Unless [Config.LogTLSErrors] is set, srv.ErrorLog is replaced for the lifetime
+// of the call with a filter that drops TLS handshake error lines and forwards
+// the rest; the original logger is not restored.
 //
 // Panics if ctx, srv or l is nil. Panics from srv.Serve are recovered and
-// returned as an error matching ErrServePanic.
+// returned as an error matching [ErrServePanic].
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) {
 	if ctx == nil {
 		panic("webserv: nil context.Context")
@@ -118,6 +124,11 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 	serveErr := make(chan error, 1)
 	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if !cfg.LogTLSErrors {
+		// Install the filter before serving so the single write to
+		// srv.ErrorLog happens-before any connection goroutine reads it.
+		installTLSErrorLogFilter(srv)
+	}
 	cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
 	go func() {
 		defer func() {
@@ -125,14 +136,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 				serveErr <- newErrServePanic(p)
 			}
 		}()
-		serveErr <- func() (err error) {
-			if !cfg.LogTLSErrors {
-				restore := filterTLSErrorLog(srv)
-				defer restore()
-			}
-			err = srv.Serve(l)
-			return
-		}()
+		serveErr <- srv.Serve(l)
 	}()
 	select {
 	case err = <-serveErr:
@@ -162,11 +166,12 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 	return err
 }
 
-// Serve creates an http.Server with reasonable defaults and calls ServeWith.
+// Serve creates an [net/http.Server] with reasonable defaults and calls
+// [Config.ServeWith].
 //
-// The server uses handler as its Handler; if handler is nil, http.DefaultServeMux
-// is used by net/http. ReadHeaderTimeout is set to 5 seconds and IdleTimeout is
-// set to 1 minute.
+// The server uses handler as its Handler; if handler is nil,
+// [net/http.DefaultServeMux] is used by net/http. ReadHeaderTimeout is set to 5
+// seconds and IdleTimeout is set to 1 minute.
 //
 // Serve takes ownership of l for serving. It returns nil after a clean shutdown,
 // returns ctx.Err() when ctx cancellation starts shutdown, and otherwise returns
@@ -182,11 +187,11 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
 	return cfg.ServeWith(ctx, srv, l)
 }
 
-// ListenAndServe calls Listen followed by Serve.
+// ListenAndServe calls [Config.Listen] followed by [Config.Serve].
 //
 // It returns ctx.Err() without opening a listener if ctx is already canceled.
-// Otherwise, it performs the setup documented by Listen and then serves requests
-// with the default server settings documented by Serve.
+// Otherwise, it performs the setup documented by [Config.Listen] and then serves
+// requests with the default server settings documented by [Config.Serve].
 //
 // The returned error is from Listen, Serve, ctx cancellation, or shutdown. A nil
 // return means the server started successfully and then shut down cleanly.
