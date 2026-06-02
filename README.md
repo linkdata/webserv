@@ -14,7 +14,7 @@ Given a listen address, certificate directory, user name and data directory:
 * Starts listening on the address and port.
 * If listening succeeds but a later setup step fails, `Listen()` still returns an error and closes the listener, but `cfg.ListenURL` may already have been populated.
 * If user name is given, switch to that user.
-* If data directory is given, create it if needed.
+* If data directory is given, resolve it to an absolute path and, when `DataDirMode` is nonzero, create it if needed.
 * When serving, listen for SIGINT and SIGTERM and do a controlled shutdown.
 * `ServeWith` requires non-nil `ctx`, `srv`, and `listener`; panics from `srv.Serve` are recovered and returned as an error matching `ErrServePanic`.
 * Path values are treated as trusted config: certificate filenames and data-dir suffixes may use `..` and symlinks and can resolve outside their base directories.
@@ -25,7 +25,7 @@ Wiring up `http.Server` and `net.Listener` by hand is easy to get subtly wrong. 
 
 ### Security
 
-* **Drops privileges safely (Unix only).** Bind to a privileged port (80/443) as root, then switch to an unprivileged `User`. Supplementary groups, GID and UID are dropped in the correct order (`setgroups` → `setgid` → `setuid`), and `HOME`/`USER`/`XDG_CONFIG_HOME` are fixed up to match.
+* **Drops privileges safely (Unix only).** Bind to a privileged port (80/443) as root, then switch to an unprivileged `User`. Supplementary groups, GID and UID are dropped in the correct order (`setgroups` → `setgid` → `setuid`), `HOME` and `USER` are set to match the target user, and `XDG_CONFIG_HOME` is unset so config-dir lookups follow the new `HOME`.
 * **Sane timeouts by default.** `Serve` sets `ReadHeaderTimeout` and `IdleTimeout`. A bare `http.Server{}` has no timeouts at all, leaving it open to Slowloris-style connection exhaustion.
 * **TLS 1.3 minimum.** When a certificate is loaded, the listener pins `MinVersion` to TLS 1.3 instead of relying on the standard library default.
 * **Quiet TLS handshake errors.** Failed handshakes (port scanners, plain HTTP sent to an HTTPS port) no longer flood your logs by default; set `LogTLSErrors` to keep them.
