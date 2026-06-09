@@ -122,6 +122,7 @@ func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 		var buf bytes.Buffer
 		logger := newNotifyingLogger(&buf, listeningLogMessage)
 		cfg := &webserv.Config{
+			Address:     "127.0.0.1:0",
 			CertDir:     destdir,
 			User:        os.Getenv("USER"),
 			DataDir:     homeDir,
@@ -159,6 +160,7 @@ func TestConfig_ListenAndServe_Cancelled(t *testing.T) {
 		var buf bytes.Buffer
 		logger := newNotifyingLogger(&buf, listeningLogMessage)
 		cfg := &webserv.Config{
+			Address:     "127.0.0.1:0",
 			CertDir:     destdir,
 			User:        os.Getenv("USER"),
 			DataDir:     homeDir,
@@ -339,21 +341,29 @@ func TestConfigListen_ErrorClearsCallerDataDir(t *testing.T) {
 	}
 }
 
-func assertServeWithPanics(t *testing.T, wantPanic string, fn func()) {
+func assertPanics(t *testing.T, wantPanic string, fn func()) {
 	t.Helper()
 	defer func() {
 		switch r := recover().(type) {
 		case nil:
-			t.Fatalf("expected ServeWith() to panic with %q", wantPanic)
+			t.Fatalf("expected call to panic with %q", wantPanic)
 		case string:
 			if r != wantPanic {
-				t.Fatalf("ServeWith() panic = %q, want %q", r, wantPanic)
+				t.Fatalf("panic = %q, want %q", r, wantPanic)
 			}
 		default:
-			t.Fatalf("ServeWith() panic = %v (%T), want string %q", r, r, wantPanic)
+			t.Fatalf("panic = %v (%T), want string %q", r, r, wantPanic)
 		}
 	}()
 	fn()
+}
+
+func TestConfigListenAndServe_NilContextPanics(t *testing.T) {
+	cfg := &webserv.Config{}
+	var nilCtx context.Context
+	assertPanics(t, "webserv: nil context.Context", func() {
+		_ = cfg.ListenAndServe(nilCtx, nil)
+	})
 }
 
 func TestConfigServeWith_NilContextPanics(t *testing.T) {
@@ -365,7 +375,7 @@ func TestConfigServeWith_NilContextPanics(t *testing.T) {
 
 	cfg := &webserv.Config{}
 	var nilCtx context.Context
-	assertServeWithPanics(t, "webserv: nil context.Context", func() {
+	assertPanics(t, "webserv: nil context.Context", func() {
 		_ = cfg.ServeWith(nilCtx, &http.Server{}, l)
 	})
 }
@@ -374,7 +384,7 @@ func TestConfigServeWith_NilListenerPanics(t *testing.T) {
 	cfg := &webserv.Config{}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	assertServeWithPanics(t, "webserv: nil net.Listener", func() {
+	assertPanics(t, "webserv: nil net.Listener", func() {
 		_ = cfg.ServeWith(ctx, &http.Server{}, nil)
 	})
 }
@@ -387,7 +397,7 @@ func TestConfigServeWith_NilServerPanics(t *testing.T) {
 	defer func() { _ = l.Close() }()
 
 	cfg := &webserv.Config{}
-	assertServeWithPanics(t, "webserv: nil http.Server", func() {
+	assertPanics(t, "webserv: nil http.Server", func() {
 		_ = cfg.ServeWith(t.Context(), nil, l)
 	})
 }

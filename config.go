@@ -208,6 +208,9 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
 //
 // Panics if ctx is nil.
 func (cfg *Config) ListenAndServe(ctx context.Context, handler http.Handler) (err error) {
+	if ctx == nil {
+		panic("webserv: nil context.Context")
+	}
 	if err = ctx.Err(); err == nil {
 		var l net.Listener
 		if l, err = cfg.Listen(); err == nil {
