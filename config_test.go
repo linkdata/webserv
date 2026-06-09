@@ -125,7 +125,7 @@ func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 			CertDir:     destdir,
 			User:        os.Getenv("USER"),
 			DataDir:     homeDir,
-			DataDirMode: 0750,
+			DataDirMode: 0o750,
 			Logger:      logger,
 		}
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second*5)
@@ -162,7 +162,7 @@ func TestConfig_ListenAndServe_Cancelled(t *testing.T) {
 			CertDir:     destdir,
 			User:        os.Getenv("USER"),
 			DataDir:     homeDir,
-			DataDirMode: 0750,
+			DataDirMode: 0o750,
 			Logger:      logger,
 		}
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second*5)
@@ -316,6 +316,26 @@ func TestConfigListen_ErrorStillAbsolutizesCertDir(t *testing.T) {
 	}
 	if cfg.CertDir != absCertDir {
 		t.Fatalf("CertDir not absolutized on error: got %q want %q", cfg.CertDir, absCertDir)
+	}
+}
+
+func TestConfigListen_ErrorClearsCallerDataDir(t *testing.T) {
+	// A failure before DataDir is computed (here, missing cert files in an
+	// existing CertDir) still resets a caller-supplied cfg.DataDir to empty.
+	cfg := &webserv.Config{
+		CertDir: t.TempDir(),
+		DataDir: t.TempDir(),
+	}
+
+	l, err := cfg.Listen()
+	if l != nil {
+		_ = l.Close()
+	}
+	if err == nil {
+		t.Fatal("expected Listen() error for missing cert files")
+	}
+	if cfg.DataDir != "" {
+		t.Fatalf("DataDir not cleared on error: got %q", cfg.DataDir)
 	}
 }
 

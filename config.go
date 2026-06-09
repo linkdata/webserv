@@ -56,8 +56,9 @@ func (cfg *Config) shutdownTimeLimit() (limit time.Duration) {
 //
 // If cfg.Address was set, any address or port given there overrides these defaults.
 //
-// If cfg.User is set it then switches to that user and the users primary group
-// using [BecomeUser]. Note that this is not supported on Windows.
+// If cfg.User is set it then switches to that user with [BecomeUser], dropping
+// supplementary groups, GID and UID (when running as root). Note that this is
+// not supported on Windows.
 //
 // If cfg.DataDir or cfg.DefaultDataDirSuffix is set, calculates the absolute
 // data directory path with [DefaultDataDir] and sets cfg.DataDir. If
@@ -65,6 +66,9 @@ func (cfg *Config) shutdownTimeLimit() (limit time.Duration) {
 // using cfg.DataDirMode subject to the process umask.
 //
 // On return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
+// If Listen returns an error, cfg.DataDir is reset to empty regardless of the
+// value the caller supplied, while cfg.CertDir keeps any absolute path resolved
+// before the failure.
 // If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
 // URL like "http://localhost:80" as soon as the socket is opened.
 // Therefore cfg.ListenURL can be non-empty even if Listen returns an error from a
@@ -97,13 +101,18 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 	return
 }
 
-// ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls
-// srv.Serve(l). If ctx is canceled, the server is shut down with
-// [net/http.Server.Shutdown] and this function returns with ctx.Err().
+// ServeWith catches SIGINT and SIGTERM and calls srv.Serve(l). A controlled
+// shutdown is triggered by either of those signals or by ctx being canceled,
+// using [net/http.Server.Shutdown] bounded by [Config.ShutdownTimeLimit] (or 1
+// second when [Config.ShutdownTimeLimit] is zero).
 //
-// Returns nil if the server started successfully and then cleanly shut down.
-// Graceful shutdown waits for [Config.ShutdownTimeLimit], or 1 second when
-// [Config.ShutdownTimeLimit] is zero.
+// The returned error depends on what ended serving:
+//   - a clean shutdown returns nil ([net/http.ErrServerClosed] is mapped to nil);
+//   - if ctx was canceled, it returns ctx.Err(); a shutdown that then exceeds
+//     [Config.ShutdownTimeLimit] does not replace that ctx.Err();
+//   - if a signal triggered the shutdown, it returns the shutdown error (such as
+//     [context.DeadlineExceeded] when draining exceeds [Config.ShutdownTimeLimit]),
+//     otherwise the error from srv.Serve.
 //
 // Unless [Config.LogTLSErrors] is set, srv.ErrorLog is replaced for the lifetime
 // of the call with a filter that drops TLS handshake error lines and forwards
@@ -173,9 +182,10 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 // [net/http.DefaultServeMux] is used by net/http. ReadHeaderTimeout is set to 5
 // seconds and IdleTimeout is set to 1 minute.
 //
-// Serve takes ownership of l for serving. It returns nil after a clean shutdown,
-// returns ctx.Err() when ctx cancellation starts shutdown, and otherwise returns
-// the error from serving or shutting down.
+// Serve takes ownership of l for serving and returns the error from
+// [Config.ServeWith]; see that method for the full return contract (nil on a
+// clean shutdown, ctx.Err() on ctx cancellation, otherwise the shutdown or
+// serve error).
 //
 // Panics if ctx or l is nil.
 func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error {
