@@ -11,7 +11,9 @@ import (
 // of [os.UserConfigDir] and defaultSuffix.
 //
 // It will expand environment variables in the path before evaluating the
-// absolute path.
+// absolute path. If expansion collapses the path to empty (for example a lone
+// "$VAR" whose variable is unset), the result is empty rather than the current
+// working directory.
 //
 // dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
 // They are not confined to the user config directory, so they may resolve
@@ -27,8 +29,12 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) {
 		}
 	}
 	if err == nil && result != "" {
-		result = os.ExpandEnv(result)
-		result, err = filepath.Abs(result)
+		// Re-check after expansion: a non-empty input may expand to empty
+		// (e.g. "$HOME" with HOME unset), and filepath.Abs("") would resolve
+		// to the current working directory rather than leaving result empty.
+		if result = os.ExpandEnv(result); result != "" {
+			result, err = filepath.Abs(result)
+		}
 	}
 	return
 }

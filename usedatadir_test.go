@@ -2,7 +2,6 @@ package webserv_test
 
 import (
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -23,9 +22,12 @@ func TestDefaultDataDir(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	want, _ := filepath.Abs(path.Join("foo"))
+	want, err := filepath.Abs("foo")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got != want {
-		t.Error(got)
+		t.Errorf("DefaultDataDir(%q) = %q, want %q", "foo", got, want)
 	}
 
 	got, err = webserv.DefaultDataDir("", "")
@@ -37,8 +39,39 @@ func TestDefaultDataDir(t *testing.T) {
 	}
 }
 
+func TestDefaultDataDir_ExpandsEnv(t *testing.T) {
+	// DefaultDataDir expands environment variables before absolutizing, so a
+	// "$VAR" in dataDir resolves to the variable's value.
+	dir := t.TempDir()
+	t.Setenv("WEBSERV_TEST_DATADIR", dir)
+
+	got, err := webserv.DefaultDataDir("$WEBSERV_TEST_DATADIR/sub", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "sub"); got != want {
+		t.Fatalf("DefaultDataDir expanded to %q, want %q", got, want)
+	}
+}
+
+func TestDefaultDataDir_ExpandToEmptyIsNotCwd(t *testing.T) {
+	// A non-empty dataDir that expands to empty (an unset variable) must yield
+	// an empty result, never the current working directory via filepath.Abs("").
+	t.Setenv("WEBSERV_TEST_UNSET", "")
+
+	for _, suffix := range []string{"", "suffix"} {
+		got, err := webserv.DefaultDataDir("$WEBSERV_TEST_UNSET", suffix)
+		if err != nil {
+			t.Fatalf("DefaultDataDir(%q, %q) error: %v", "$WEBSERV_TEST_UNSET", suffix, err)
+		}
+		if got != "" {
+			t.Fatalf("DefaultDataDir(%q, %q) = %q, want empty string", "$WEBSERV_TEST_UNSET", suffix, got)
+		}
+	}
+}
+
 func TestUseDataDir(t *testing.T) {
-	got, err := webserv.UseDataDir(".", 0750)
+	got, err := webserv.UseDataDir(".", 0o750)
 	if err != nil {
 		t.Error(err)
 	}
@@ -52,7 +85,7 @@ func TestUseDataDir_DoesNotDoubleExpandEnv(t *testing.T) {
 	// path survives unchanged.
 	dir := t.TempDir()
 	literalDollar := filepath.Join(dir, "$NOTAVAR")
-	if err := os.MkdirAll(literalDollar, 0750); err != nil {
+	if err := os.MkdirAll(literalDollar, 0o750); err != nil {
 		t.Fatal(err)
 	}
 	got, err := webserv.UseDataDir(literalDollar, 0)
