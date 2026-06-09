@@ -383,8 +383,11 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
 // return means the server started successfully and then shut down cleanly.
 //
 // Panics if ctx is nil.
-func (cfg *Config) ListenAndServe(ctx context.Context, handler http.Handler) (err error) <span class="cov2" title="2">{
-        if err = ctx.Err(); err == nil </span><span class="cov2" title="2">{
+func (cfg *Config) ListenAndServe(ctx context.Context, handler http.Handler) (err error) <span class="cov4" title="3">{
+        if ctx == nil </span><span class="cov1" title="1">{
+                panic("webserv: nil context.Context")</span>
+        }
+        <span class="cov2" title="2">if err = ctx.Err(); err == nil </span><span class="cov2" title="2">{
                 var l net.Listener
                 if l, err = cfg.Listen(); err == nil </span><span class="cov2" title="2">{
                         err = cfg.Serve(ctx, l, handler)
@@ -571,17 +574,17 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 }
 
 func normalizeListenAddr(address, defaultpriv, defaultother string) (result string, err error) <span class="cov10" title="29">{
-        if _, _, err = net.SplitHostPort(address); err == nil </span><span class="cov8" title="16">{
+        if _, _, err = net.SplitHostPort(address); err == nil </span><span class="cov9" title="20">{
                 // host and port both present
                 if strings.HasPrefix(address, "[]") </span><span class="cov4" title="4">{
                         err = net.InvalidAddrError(address)
-                }</span> else<span class="cov7" title="12"> {
+                }</span> else<span class="cov8" title="16"> {
                         result = address
                 }</span>
-                <span class="cov8" title="16">return</span>
+                <span class="cov9" title="20">return</span>
         }
 
-        <span class="cov7" title="13">err = nil
+        <span class="cov6" title="9">err = nil
         defaultPort := defaultListenPort(os.Geteuid(), defaultpriv, defaultother)
 
         result = address
@@ -593,18 +596,18 @@ func normalizeListenAddr(address, defaultpriv, defaultother string) (result stri
                         err = net.InvalidAddrError(address)
                 }</span>
         }
-        <span class="cov7" title="13">if err == nil </span><span class="cov6" title="8">{
+        <span class="cov6" title="9">if err == nil </span><span class="cov4" title="4">{
                 result = net.JoinHostPort(result, defaultPort)
         }</span>
-        <span class="cov7" title="13">return</span>
+        <span class="cov6" title="9">return</span>
 }
 
-func defaultListenPort(euid int, defaultpriv, defaultother string) (port string) <span class="cov8" title="16">{
+func defaultListenPort(euid int, defaultpriv, defaultother string) (port string) <span class="cov7" title="12">{
         port = defaultother
         if euid == 0 </span><span class="cov1" title="1">{
                 port = defaultpriv
         }</span>
-        <span class="cov8" title="16">return</span>
+        <span class="cov7" title="12">return</span>
 }
 
 func localhostOrDNSName(cert *tls.Certificate) string <span class="cov9" title="23">{
