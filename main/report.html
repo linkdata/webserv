@@ -127,8 +127,13 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) <span class="cov5"
 
 // BecomeUser switches to the given userName if not empty.
 //
-// It sets the GID, UID and changes the USER and HOME
-// environment variables accordingly. It unsets XDG_CONFIG_HOME.
+// When running as root (euid 0) it resets the supplementary groups to those of
+// the target user and then sets the GID and UID, in that order (setgroups,
+// setgid, setuid). When not root the supplementary-groups reset is skipped and
+// setgid/setuid will fail unless the target ids already match the process.
+//
+// It then sets the HOME and USER environment variables to match the target user
+// and unsets XDG_CONFIG_HOME so config-directory lookups follow the new HOME.
 //
 // Returns an error matching [ErrBecomeUser] on failure.
 func BecomeUser(userName string) error <span class="cov10" title="16">{
@@ -227,8 +232,9 @@ func (cfg *Config) shutdownTimeLimit() (limit time.Duration) <span class="cov6" 
 //
 // If cfg.Address was set, any address or port given there overrides these defaults.
 //
-// If cfg.User is set it then switches to that user and the users primary group
-// using [BecomeUser]. Note that this is not supported on Windows.
+// If cfg.User is set it then switches to that user with [BecomeUser], dropping
+// supplementary groups, GID and UID (when running as root). Note that this is
+// not supported on Windows.
 //
 // If cfg.DataDir or cfg.DefaultDataDirSuffix is set, calculates the absolute
 // data directory path with [DefaultDataDir] and sets cfg.DataDir. If
@@ -236,11 +242,14 @@ func (cfg *Config) shutdownTimeLimit() (limit time.Duration) <span class="cov6" 
 // using cfg.DataDirMode subject to the process umask.
 //
 // On return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
+// If Listen returns an error, cfg.DataDir is reset to empty regardless of the
+// value the caller supplied, while cfg.CertDir keeps any absolute path resolved
+// before the failure.
 // If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
 // URL like "http://localhost:80" as soon as the socket is opened.
 // Therefore cfg.ListenURL can be non-empty even if Listen returns an error from a
 // later step, such as user switching or data directory setup.
-func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov7" title="10">{
+func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov7" title="11">{
         if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL); err == nil </span><span class="cov6" title="8">{
                 if cfg.CertDir != "" </span><span class="cov4" title="4">{
                         cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
@@ -258,23 +267,28 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov7" title
                         }
                 }
         }
-        <span class="cov7" title="10">if err != nil </span><span class="cov4" title="4">{
+        <span class="cov7" title="11">if err != nil </span><span class="cov5" title="5">{
                 cfg.DataDir = ""
                 if l != nil </span><span class="cov2" title="2">{
                         _ = l.Close()
                         l = nil
                 }</span>
         }
-        <span class="cov7" title="10">return</span>
+        <span class="cov7" title="11">return</span>
 }
 
-// ServeWith sets up a signal handler to catch SIGINT and SIGTERM and then calls
-// srv.Serve(l). If ctx is canceled, the server is shut down with
-// [net/http.Server.Shutdown] and this function returns with ctx.Err().
+// ServeWith catches SIGINT and SIGTERM and calls srv.Serve(l). A controlled
+// shutdown is triggered by either of those signals or by ctx being canceled,
+// using [net/http.Server.Shutdown] bounded by [Config.ShutdownTimeLimit] (or 1
+// second when [Config.ShutdownTimeLimit] is zero).
 //
-// Returns nil if the server started successfully and then cleanly shut down.
-// Graceful shutdown waits for [Config.ShutdownTimeLimit], or 1 second when
-// [Config.ShutdownTimeLimit] is zero.
+// The returned error depends on what ended serving:
+//   - a clean shutdown returns nil ([net/http.ErrServerClosed] is mapped to nil);
+//   - if ctx was canceled, it returns ctx.Err(); a shutdown that then exceeds
+//     [Config.ShutdownTimeLimit] does not replace that ctx.Err();
+//   - if a signal triggered the shutdown, it returns the shutdown error (such as
+//     [context.DeadlineExceeded] when draining exceeds [Config.ShutdownTimeLimit]),
+//     otherwise the error from srv.Serve.
 //
 // Unless [Config.LogTLSErrors] is set, srv.ErrorLog is replaced for the lifetime
 // of the call with a filter that drops TLS handshake error lines and forwards
@@ -344,9 +358,10 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 // [net/http.DefaultServeMux] is used by net/http. ReadHeaderTimeout is set to 5
 // seconds and IdleTimeout is set to 1 minute.
 //
-// Serve takes ownership of l for serving. It returns nil after a clean shutdown,
-// returns ctx.Err() when ctx cancellation starts shutdown, and otherwise returns
-// the error from serving or shutting down.
+// Serve takes ownership of l for serving and returns the error from
+// [Config.ServeWith]; see that method for the full return contract (nil on a
+// clean shutdown, ctx.Err() on ctx cancellation, otherwise the shutdown or
+// serve error).
 //
 // Panics if ctx or l is nil.
 func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error <span class="cov2" title="2">{
@@ -524,7 +539,7 @@ const (
 // Returns the [net.Listener] and listenURL if there was no error.
 // absCertDir is the resolved absolute path to certDir whenever certDir was
 // non-empty and could be resolved, even if loading the certificate then failed.
-func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) <span class="cov9" title="20">{
+func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) <span class="cov9" title="21">{
         var cert *tls.Certificate
         if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil </span><span class="cov8" title="19">{
                 var bindAddr string
@@ -532,7 +547,8 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
                 if cert != nil </span><span class="cov6" title="7">{
                         schemesuffix = "s"
                         if bindAddr, err = normalizeListenAddr(listenAddr, "443", "8443"); err == nil </span><span class="cov6" title="7">{
-                                l, err = tls.Listen("tcp", bindAddr,
+                                l, err = tls.Listen(
+                                        "tcp", bindAddr,
                                         &amp;tls.Config{
                                                 Certificates: []tls.Certificate{*cert},
                                                 MinVersion:   tls.VersionTLS13,
@@ -551,7 +567,7 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
                         }</span>
                 }
         }
-        <span class="cov9" title="20">return</span>
+        <span class="cov9" title="21">return</span>
 }
 
 func normalizeListenAddr(address, defaultpriv, defaultother string) (result string, err error) <span class="cov10" title="29">{
@@ -591,27 +607,31 @@ func defaultListenPort(euid int, defaultpriv, defaultother string) (port string)
         <span class="cov8" title="16">return</span>
 }
 
-func localhostOrDNSName(cert *tls.Certificate) string <span class="cov8" title="14">{
-        if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span><span class="cov6" title="7">{
+func localhostOrDNSName(cert *tls.Certificate) string <span class="cov9" title="23">{
+        if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span><span class="cov7" title="12">{
                 name := cert.Leaf.DNSNames[0]
-                if host, _, err := net.SplitHostPort(name); err == nil </span><span class="cov6" title="7">{
+                if host, _, err := net.SplitHostPort(name); err == nil </span><span class="cov6" title="8">{
                         name = host
                 }</span>
-                <span class="cov6" title="7">return name</span>
+                // Guard against a certificate whose first DNS name is empty (or strips
+                // to empty): an empty host would build an unconnectable ":port" URL.
+                <span class="cov7" title="12">if name != "" </span><span class="cov7" title="10">{
+                        return name
+                }</span>
         }
-        <span class="cov6" title="7">return "localhost"</span>
+        <span class="cov7" title="13">return "localhost"</span>
 }
 
-func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) <span class="cov8" title="14">{
+func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) <span class="cov8" title="16">{
         addr = l.Addr().String()
-        if host, port, err := net.SplitHostPort(addr); err == nil </span><span class="cov8" title="14">{
-                if ip := net.ParseIP(host); ip != nil </span><span class="cov8" title="14">{
-                        if ip.IsUnspecified() || ip.IsLoopback() </span><span class="cov8" title="14">{
+        if host, port, err := net.SplitHostPort(addr); err == nil </span><span class="cov8" title="16">{
+                if ip := net.ParseIP(host); ip != nil </span><span class="cov8" title="16">{
+                        if ip.IsUnspecified() || ip.IsLoopback() </span><span class="cov8" title="16">{
                                 addr = net.JoinHostPort(localhostOrDNSName(cert), port)
                         }</span>
                 }
         }
-        <span class="cov8" title="14">return</span>
+        <span class="cov8" title="16">return</span>
 }
 </pre>
 		
@@ -638,25 +658,25 @@ import (
 // cert is non-nil only when the key pair loaded successfully. absCertDir is the
 // resolved absolute directory whenever certDir was non-empty and [path/filepath.Abs]
 // succeeded, regardless of whether the key pair then loaded.
-func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, absCertDir string, err error) <span class="cov10" title="23">{
-        if certDir != "" </span><span class="cov7" title="10">{
+func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, absCertDir string, err error) <span class="cov10" title="24">{
+        if certDir != "" </span><span class="cov7" title="11">{
                 certDir = os.ExpandEnv(certDir)
-                if absCertDir, err = filepath.Abs(certDir); err == nil </span><span class="cov7" title="10">{
+                if absCertDir, err = filepath.Abs(certDir); err == nil </span><span class="cov7" title="11">{
                         var cer tls.Certificate
-                        if fullchainPem == "" </span><span class="cov7" title="9">{
+                        if fullchainPem == "" </span><span class="cov7" title="10">{
                                 fullchainPem = FullchainPem
                         }</span>
-                        <span class="cov7" title="10">if privkeyPem == "" </span><span class="cov7" title="9">{
+                        <span class="cov7" title="11">if privkeyPem == "" </span><span class="cov7" title="10">{
                                 privkeyPem = PrivkeyPem
                         }</span>
-                        <span class="cov7" title="10">fc := filepath.Join(absCertDir, fullchainPem)
+                        <span class="cov7" title="11">fc := filepath.Join(absCertDir, fullchainPem)
                         pk := filepath.Join(absCertDir, privkeyPem)
                         if cer, err = tls.LoadX509KeyPair(fc, pk); err == nil </span><span class="cov7" title="9">{
                                 cert = &amp;cer
                         }</span>
                 }
         }
-        <span class="cov10" title="23">return</span>
+        <span class="cov10" title="24">return</span>
 }
 </pre>
 		
@@ -673,26 +693,32 @@ import (
 // of [os.UserConfigDir] and defaultSuffix.
 //
 // It will expand environment variables in the path before evaluating the
-// absolute path.
+// absolute path. If expansion collapses the path to empty (for example a lone
+// "$VAR" whose variable is unset), the result is empty rather than the current
+// working directory.
 //
 // dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
 // They are not confined to the user config directory, so they may resolve
 // outside of it. Caller is responsible for validating or sandboxing untrusted
 // path input.
-func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <span class="cov10" title="10">{
+func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <span class="cov10" title="13">{
         result = dataDir
-        if result == "" </span><span class="cov8" title="7">{
+        if result == "" </span><span class="cov7" title="7">{
                 if defaultSuffix != "" </span><span class="cov3" title="2">{
                         if result, err = os.UserConfigDir(); err == nil </span><span class="cov3" title="2">{
                                 result = filepath.Join(result, defaultSuffix)
                         }</span>
                 }
         }
-        <span class="cov10" title="10">if err == nil &amp;&amp; result != "" </span><span class="cov7" title="5">{
-                result = os.ExpandEnv(result)
-                result, err = filepath.Abs(result)
-        }</span>
-        <span class="cov10" title="10">return</span>
+        <span class="cov10" title="13">if err == nil &amp;&amp; result != "" </span><span class="cov8" title="8">{
+                // Re-check after expansion: a non-empty input may expand to empty
+                // (e.g. "$HOME" with HOME unset), and filepath.Abs("") would resolve
+                // to the current working directory rather than leaving result empty.
+                if result = os.ExpandEnv(result); result != "" </span><span class="cov7" title="6">{
+                        result, err = filepath.Abs(result)
+                }</span>
+        }
+        <span class="cov10" title="13">return</span>
 }
 
 // UseDataDir transforms dataDir into an absolute path. Then, if mode
@@ -702,16 +728,16 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <s
 // dataDir is empty. Does not expand environment variables in the path.
 //
 // Returns the final path or an empty string if dataDir was empty.
-func UseDataDir(dataDir string, mode fs.FileMode) (string, error) <span class="cov9" title="8">{
+func UseDataDir(dataDir string, mode fs.FileMode) (string, error) <span class="cov8" title="8">{
         var err error
-        if dataDir != "" </span><span class="cov6" title="4">{
-                if dataDir, err = filepath.Abs(dataDir); err == nil </span><span class="cov6" title="4">{
-                        if mode != 0 </span><span class="cov5" title="3">{
+        if dataDir != "" </span><span class="cov5" title="4">{
+                if dataDir, err = filepath.Abs(dataDir); err == nil </span><span class="cov5" title="4">{
+                        if mode != 0 </span><span class="cov4" title="3">{
                                 err = os.MkdirAll(dataDir, mode)
                         }</span>
                 }
         }
-        <span class="cov9" title="8">return dataDir, err</span>
+        <span class="cov8" title="8">return dataDir, err</span>
 }
 </pre>
 		
