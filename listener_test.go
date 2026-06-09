@@ -37,8 +37,8 @@ EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
 				t.Error(err)
 			}
 		}()
-		if err = os.WriteFile(filepath.Join(destdir, webserv.FullchainPem), certPem, 0640); err == nil {
-			if err = os.WriteFile(filepath.Join(destdir, webserv.PrivkeyPem), keyPem, 0640); err == nil {
+		if err = os.WriteFile(filepath.Join(destdir, webserv.FullchainPem), certPem, 0o640); err == nil {
+			if err = os.WriteFile(filepath.Join(destdir, webserv.PrivkeyPem), keyPem, 0o640); err == nil {
 				fn(destdir)
 			}
 		}

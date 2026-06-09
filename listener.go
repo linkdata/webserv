@@ -37,7 +37,8 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 		if cert != nil {
 			schemesuffix = "s"
 			if bindAddr, err = normalizeListenAddr(listenAddr, "443", "8443"); err == nil {
-				l, err = tls.Listen("tcp", bindAddr,
+				l, err = tls.Listen(
+					"tcp", bindAddr,
 					&tls.Config{
 						Certificates: []tls.Certificate{*cert},
 						MinVersion:   tls.VersionTLS13,
@@ -102,7 +103,11 @@ func localhostOrDNSName(cert *tls.Certificate) string {
 		if host, _, err := net.SplitHostPort(name); err == nil {
 			name = host
 		}
-		return name
+		// Guard against a certificate whose first DNS name is empty (or strips
+		// to empty): an empty host would build an unconnectable ":port" URL.
+		if name != "" {
+			return name
+		}
 	}
 	return "localhost"
 }
