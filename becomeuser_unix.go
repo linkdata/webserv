@@ -33,8 +33,13 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) {
 
 // BecomeUser switches to the given userName if not empty.
 //
-// It sets the GID, UID and changes the USER and HOME
-// environment variables accordingly. It unsets XDG_CONFIG_HOME.
+// When running as root (euid 0) it resets the supplementary groups to those of
+// the target user and then sets the GID and UID, in that order (setgroups,
+// setgid, setuid). When not root the supplementary-groups reset is skipped and
+// setgid/setuid will fail unless the target ids already match the process.
+//
+// It then sets the HOME and USER environment variables to match the target user
+// and unsets XDG_CONFIG_HOME so config-directory lookups follow the new HOME.
 //
 // Returns an error matching [ErrBecomeUser] on failure.
 func BecomeUser(userName string) error {
