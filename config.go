@@ -108,8 +108,10 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 //
 // The returned error depends on what ended serving:
 //   - a clean shutdown returns nil ([net/http.ErrServerClosed] is mapped to nil);
-//   - if ctx was canceled, it returns ctx.Err(); a shutdown that then exceeds
-//     [Config.ShutdownTimeLimit] does not replace that ctx.Err();
+//   - if ctx was canceled, it returns an error matching ctx.Err(); if srv.Serve
+//     also exits with a non-clean error, the errors are joined with
+//     [errors.Join]; a shutdown that then exceeds [Config.ShutdownTimeLimit]
+//     does not replace that ctx.Err();
 //   - if a signal triggered the shutdown, it returns the shutdown error (such as
 //     [context.DeadlineExceeded] when draining exceeds [Config.ShutdownTimeLimit]),
 //     otherwise the error from srv.Serve.
@@ -161,6 +163,9 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 		shutdownErr := srv.Shutdown(shutdownCtx)
 		shutdownCancel()
 		serveExitErr := <-serveErr
+		if errors.Is(serveExitErr, http.ErrServerClosed) {
+			serveExitErr = nil
+		}
 		if err == nil {
 			if shutdownErr != nil {
 				err = shutdownErr
@@ -168,6 +173,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 				err = serveExitErr
 			}
 		}
+		err = errors.Join(err, serveExitErr)
 	}
 	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
