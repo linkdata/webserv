@@ -12,6 +12,18 @@ import (
 	"github.com/linkdata/webserv"
 )
 
+func urlHostAndPort(t *testing.T, scheme string, l net.Listener) string {
+	t.Helper()
+	host, port, err := net.SplitHostPort(l.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		host = "localhost"
+	}
+	return scheme + "://" + net.JoinHostPort(host, port)
+}
+
 func withCertFiles(t *testing.T, fn func(destdir string)) {
 	t.Helper()
 	certPem := []byte(`-----BEGIN CERTIFICATE-----
@@ -71,15 +83,10 @@ func TestRandomPort(t *testing.T) {
 
 func TestNew(t *testing.T) {
 	withCertFiles(t, func(destdir string) {
-		httpPort := "8080"
-		httpsPort := "8443"
-		if os.Getuid() < 1 {
-			httpPort = "80"
-			httpsPort = "443"
-		}
 		type args struct {
-			wantAddress string
-			certDir     string
+			address string
+			certDir string
+			scheme  string
 		}
 		tests := []struct {
 			name    string
@@ -87,47 +94,54 @@ func TestNew(t *testing.T) {
 			wantErr bool
 		}{
 			{
-				name:    "http://localhost:" + httpPort,
-				args:    args{},
+				name: "http random port",
+				args: args{
+					address: "127.0.0.1:0",
+					scheme:  "http",
+				},
 				wantErr: false,
 			},
 			{
-				name: "http://localhost:8888",
+				name: "http explicit random port",
 				args: args{
-					wantAddress: "localhost:8888",
+					address: "localhost:0",
+					scheme:  "http",
 				},
 			},
 			{
-				name: "https://localhost:" + httpsPort,
+				name: "https random port",
 				args: args{
+					address: "127.0.0.1:0",
 					certDir: destdir,
+					scheme:  "https",
 				},
 			},
 			{
-				name: "https://localhost:4443",
+				name: "https explicit random port",
 				args: args{
-					wantAddress: "localhost:4443",
-					certDir:     destdir,
+					address: "localhost:0",
+					certDir: destdir,
+					scheme:  "https",
 				},
 			},
 			{
 				name: "invalid port",
 				args: args{
-					wantAddress: "127.0.0.1:99999",
+					address: "127.0.0.1:99999",
 				},
 				wantErr: true,
 			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				gotListener, gotUrl, gotCertDir, err := webserv.Listener(tt.args.wantAddress, tt.args.certDir, "", "", "")
+				gotListener, gotUrl, gotCertDir, err := webserv.Listener(tt.args.address, tt.args.certDir, "", "", "")
 				if (err != nil) != tt.wantErr {
-					t.Errorf("Listener() %q error = %v, wantErr %v", tt.args.wantAddress, err, tt.wantErr)
+					t.Errorf("Listener() %q error = %v, wantErr %v", tt.args.address, err, tt.wantErr)
 					return
 				}
 				if gotListener != nil {
-					if gotUrl != tt.name {
-						t.Errorf("ListenURL() = %v, want %v", gotUrl, tt.name)
+					if want := urlHostAndPort(t, tt.args.scheme, gotListener); gotUrl != want {
+						t.Errorf("ListenURL() = %v, want %v", gotUrl, want)
 					}
 					if gotCertDir != tt.args.certDir {
 						t.Error(gotCertDir)
