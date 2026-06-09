@@ -25,6 +25,24 @@ func TestLoadCert_UsesFilepathJoinNotPathJoin(t *testing.T) {
 	})
 }
 
+func TestLoadCert_ExpandToEmptyIsNotCwd(t *testing.T) {
+	// A non-empty certDir that expands to empty (an unset variable) must be
+	// treated as "no certificate directory", never resolved to the current
+	// working directory via filepath.Abs("").
+	t.Setenv("WEBSERV_TEST_UNSET", "")
+
+	cert, absCertDir, err := webserv.LoadCert("$WEBSERV_TEST_UNSET", "", "")
+	if err != nil {
+		t.Fatalf("LoadCert(%q) error: %v", "$WEBSERV_TEST_UNSET", err)
+	}
+	if cert != nil {
+		t.Errorf("LoadCert(%q) cert = %v, want nil", "$WEBSERV_TEST_UNSET", cert)
+	}
+	if absCertDir != "" {
+		t.Errorf("LoadCert(%q) absCertDir = %q, want empty string", "$WEBSERV_TEST_UNSET", absCertDir)
+	}
+}
+
 func TestLoadCert(t *testing.T) {
 	cert, absDir, err := webserv.LoadCert("", "", "")
 	if err != nil {
