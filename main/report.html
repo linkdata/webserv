@@ -284,8 +284,10 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov7" title
 //
 // The returned error depends on what ended serving:
 //   - a clean shutdown returns nil ([net/http.ErrServerClosed] is mapped to nil);
-//   - if ctx was canceled, it returns ctx.Err(); a shutdown that then exceeds
-//     [Config.ShutdownTimeLimit] does not replace that ctx.Err();
+//   - if ctx was canceled, it returns an error matching ctx.Err(); if srv.Serve
+//     also exits with a non-clean error, the errors are joined with
+//     [errors.Join]; a shutdown that then exceeds [Config.ShutdownTimeLimit]
+//     does not replace that ctx.Err();
 //   - if a signal triggered the shutdown, it returns the shutdown error (such as
 //     [context.DeadlineExceeded] when draining exceeds [Config.ShutdownTimeLimit]),
 //     otherwise the error from srv.Serve.
@@ -337,15 +339,19 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
                 shutdownErr := srv.Shutdown(shutdownCtx)
                 shutdownCancel()
                 serveExitErr := &lt;-serveErr
-                if err == nil </span><span class="cov4" title="3">{
+                if errors.Is(serveExitErr, http.ErrServerClosed) </span><span class="cov4" title="4">{
+                        serveExitErr = nil
+                }</span>
+                <span class="cov4" title="4">if err == nil </span><span class="cov4" title="3">{
                         if shutdownErr != nil </span><span class="cov2" title="2">{
                                 err = shutdownErr
                         }</span> else<span class="cov1" title="1"> {
                                 err = serveExitErr
                         }</span>
                 }
+                <span class="cov4" title="4">err = errors.Join(err, serveExitErr)</span>
         }
-        <span class="cov6" title="8">if errors.Is(err, http.ErrServerClosed) </span><span class="cov4" title="4">{
+        <span class="cov6" title="8">if errors.Is(err, http.ErrServerClosed) </span><span class="cov4" title="3">{
                 err = nil
         }</span>
         <span class="cov6" title="8">return err</span>
