@@ -57,7 +57,7 @@
 				
 				<option value="file0">github.com/linkdata/webserv/becomeuser_unix.go (100.0%)</option>
 				
-				<option value="file1">github.com/linkdata/webserv/config.go (100.0%)</option>
+				<option value="file1">github.com/linkdata/webserv/config.go (98.6%)</option>
 				
 				<option value="file2">github.com/linkdata/webserv/errbecomeuser.go (100.0%)</option>
 				
@@ -210,17 +210,17 @@ type Config struct {
         Logger               Logger        // logger to use, if nil logs nothing
 }
 
-func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov10" title="24">{
-        if cfg.Logger != nil </span><span class="cov8" title="12">{
+func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov10" title="26">{
+        if cfg.Logger != nil </span><span class="cov7" title="12">{
                 cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
         }</span>
 }
 
-func (cfg *Config) shutdownTimeLimit() (limit time.Duration) <span class="cov6" title="6">{
+func (cfg *Config) shutdownTimeLimit() (limit time.Duration) <span class="cov6" title="7">{
         if limit = cfg.ShutdownTimeLimit; limit == 0 </span><span class="cov4" title="4">{
                 limit = defaultShutdownTimeLimit
         }</span>
-        <span class="cov6" title="6">return</span>
+        <span class="cov6" title="7">return</span>
 }
 
 // Listen performs initial setup for a simple web server and returns a
@@ -254,12 +254,12 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov7" title
                 if cfg.CertDir != "" </span><span class="cov4" title="4">{
                         cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
                 }</span>
-                <span class="cov6" title="8">if err = BecomeUser(cfg.User); err == nil </span><span class="cov6" title="6">{
+                <span class="cov6" title="8">if err = BecomeUser(cfg.User); err == nil </span><span class="cov5" title="6">{
                         if cfg.User != "" </span><span class="cov2" title="2">{
                                 cfg.logInfo("user switched", "user", cfg.User)
                         }</span>
-                        <span class="cov6" title="6">if cfg.DataDir, err = DefaultDataDir(cfg.DataDir, cfg.DefaultDataDirSuffix); err == nil </span><span class="cov6" title="6">{
-                                if cfg.DataDir, err = UseDataDir(cfg.DataDir, cfg.DataDirMode); err == nil </span><span class="cov6" title="6">{
+                        <span class="cov5" title="6">if cfg.DataDir, err = DefaultDataDir(cfg.DataDir, cfg.DefaultDataDirSuffix); err == nil </span><span class="cov5" title="6">{
+                                if cfg.DataDir, err = UseDataDir(cfg.DataDir, cfg.DataDirMode); err == nil </span><span class="cov5" title="6">{
                                         if cfg.DataDir != "" </span><span class="cov2" title="2">{
                                                 cfg.logInfo("data directory", "dir", cfg.DataDir)
                                         }</span>
@@ -298,42 +298,42 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov7" title
 //
 // Panics if ctx, srv or l is nil. Panics from srv.Serve are recovered and
 // returned as an error matching [ErrServePanic].
-func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov7" title="11">{
+func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov7" title="12">{
         if ctx == nil </span><span class="cov1" title="1">{
                 panic("webserv: nil context.Context")</span>
         }
-        <span class="cov7" title="10">if srv == nil </span><span class="cov1" title="1">{
+        <span class="cov7" title="11">if srv == nil </span><span class="cov1" title="1">{
                 panic("webserv: nil http.Server")</span>
         }
-        <span class="cov7" title="9">if l == nil </span><span class="cov1" title="1">{
+        <span class="cov7" title="10">if l == nil </span><span class="cov1" title="1">{
                 panic("webserv: nil net.Listener")</span>
         }
-        <span class="cov6" title="8">serveErr := make(chan error, 1)
+        <span class="cov7" title="9">serveErr := make(chan error, 1)
         sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
         defer stop()
-        if !cfg.LogTLSErrors </span><span class="cov6" title="7">{
+        if !cfg.LogTLSErrors </span><span class="cov6" title="8">{
                 // Install the filter before serving so the single write to
                 // srv.ErrorLog happens-before any connection goroutine reads it.
                 installTLSErrorLogFilter(srv)
         }</span>
-        <span class="cov6" title="8">cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
-        go func() </span><span class="cov6" title="8">{
-                defer func() </span><span class="cov6" title="8">{
-                        if p := recover(); p != nil </span><span class="cov1" title="1">{
+        <span class="cov7" title="9">cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
+        go func() </span><span class="cov7" title="9">{
+                defer func() </span><span class="cov7" title="9">{
+                        if p := recover(); p != nil </span><span class="cov2" title="2">{
                                 serveErr &lt;- newErrServePanic(p)
                         }</span>
                 }()
-                <span class="cov6" title="8">serveErr &lt;- srv.Serve(l)</span>
+                <span class="cov7" title="9">serveErr &lt;- srv.Serve(l)</span>
         }()
-        <span class="cov6" title="8">select </span>{
+        <span class="cov7" title="9">select </span>{
         case err = &lt;-serveErr:<span class="cov4" title="4"></span>
-        case &lt;-sigCtx.Done():<span class="cov4" title="4">
+        case &lt;-sigCtx.Done():<span class="cov5" title="5">
                 err = ctx.Err()
                 var reason error
-                if reason = context.Cause(ctx); reason == nil </span><span class="cov4" title="3">{
+                if reason = context.Cause(ctx); reason == nil </span><span class="cov4" title="4">{
                         reason = context.Cause(sigCtx)
                 }</span>
-                <span class="cov4" title="4">stop()
+                <span class="cov5" title="5">stop()
                 cfg.logInfo("stopped", "reason", reason)
                 shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.shutdownTimeLimit())
                 shutdownErr := srv.Shutdown(shutdownCtx)
@@ -342,19 +342,20 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
                 if errors.Is(serveExitErr, http.ErrServerClosed) </span><span class="cov4" title="4">{
                         serveExitErr = nil
                 }</span>
-                <span class="cov4" title="4">if err == nil </span><span class="cov4" title="3">{
+                <span class="cov5" title="5">if err == nil </span><span class="cov4" title="4">{
                         if shutdownErr != nil </span><span class="cov2" title="2">{
                                 err = shutdownErr
-                        }</span> else<span class="cov1" title="1"> {
+                        }</span> else<span class="cov2" title="2"> {
                                 err = serveExitErr
                         }</span>
-                }
-                <span class="cov4" title="4">err = errors.Join(err, serveExitErr)</span>
+                } else<span class="cov1" title="1"> if serveExitErr != nil </span><span class="cov0" title="0">{
+                        err = errors.Join(err, serveExitErr)
+                }</span>
         }
-        <span class="cov6" title="8">if errors.Is(err, http.ErrServerClosed) </span><span class="cov4" title="3">{
+        <span class="cov7" title="9">if errors.Is(err, http.ErrServerClosed) </span><span class="cov4" title="3">{
                 err = nil
         }</span>
-        <span class="cov6" title="8">return err</span>
+        <span class="cov7" title="9">return err</span>
 }
 
 // Serve creates an [net/http.Server] with reasonable defaults and calls
@@ -452,8 +453,8 @@ type tlsErrorLogWriter struct {
         previous *log.Logger
 }
 
-func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov8" title="5">{
-        if !bytes.HasPrefix(p, tlsHandshakeErrorLogPrefixBytes) </span><span class="cov6" title="3">{
+func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov7" title="5">{
+        if !bytes.HasPrefix(p, tlsHandshakeErrorLogPrefixBytes) </span><span class="cov5" title="3">{
                 // Preserve file attribution for loggers using Lshortfile or Llongfile.
                 if w.previous != nil </span><span class="cov4" title="2">{
                         err = w.previous.Output(4, string(p))
@@ -461,10 +462,10 @@ func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov8"
                         err = log.Output(4, string(p))
                 }</span>
         }
-        <span class="cov8" title="5">if err == nil </span><span class="cov8" title="5">{
+        <span class="cov7" title="5">if err == nil </span><span class="cov7" title="5">{
                 n = len(p)
         }</span>
-        <span class="cov8" title="5">return</span>
+        <span class="cov7" title="5">return</span>
 }
 
 // installTLSErrorLogFilter wraps srv.ErrorLog so that "http: TLS handshake
@@ -475,7 +476,7 @@ func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov8"
 // [net/http.Server.Serve] starts. Doing so orders the write before every
 // connection goroutine that later reads srv.ErrorLog, so the filter is never
 // mutated again while connections are being served or drained.
-func installTLSErrorLogFilter(srv *http.Server) <span class="cov10" title="7">{
+func installTLSErrorLogFilter(srv *http.Server) <span class="cov10" title="8">{
         srv.ErrorLog = log.New(tlsErrorLogWriter{previous: srv.ErrorLog}, "", 0)
 }</span>
 </pre>
@@ -492,25 +493,25 @@ type errServePanic struct {
 // ErrServePanic matches errors returned by [Config.ServeWith] when srv.Serve panics.
 var ErrServePanic = errServePanic{}
 
-func (e errServePanic) Error() string <span class="cov4" title="2">{
+func (e errServePanic) Error() string <span class="cov5" title="3">{
         return fmt.Sprintf("ServeWith(): panic in http.Server.Serve: %v", e.recovered)
 }</span>
 
-func (e errServePanic) Is(other error) (yes bool) <span class="cov10" title="5">{
+func (e errServePanic) Is(other error) (yes bool) <span class="cov10" title="8">{
         _, yes = other.(errServePanic)
         return
 }</span>
 
-func (e errServePanic) Unwrap() error <span class="cov8" title="4">{
+func (e errServePanic) Unwrap() error <span class="cov8" title="6">{
         return e.err
 }</span>
 
-func newErrServePanic(recovered any) error <span class="cov7" title="3">{
+func newErrServePanic(recovered any) error <span class="cov7" title="4">{
         var err error
-        if recoveredError, ok := recovered.(error); ok </span><span class="cov4" title="2">{
+        if recoveredError, ok := recovered.(error); ok </span><span class="cov5" title="3">{
                 err = recoveredError
         }</span>
-        <span class="cov7" title="3">return errServePanic{
+        <span class="cov7" title="4">return errServePanic{
                 recovered: recovered,
                 err:       err,
         }</span>
@@ -523,6 +524,7 @@ import (
         "crypto/tls"
         "fmt"
         "net"
+        "net/netip"
         "os"
         "strings"
 )
@@ -548,14 +550,14 @@ const (
 // Returns the [net.Listener] and listenURL if there was no error.
 // absCertDir is the resolved absolute path to certDir whenever certDir was
 // non-empty and could be resolved, even if loading the certificate then failed.
-func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) <span class="cov9" title="21">{
+func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) <span class="cov8" title="21">{
         var cert *tls.Certificate
         if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil </span><span class="cov8" title="19">{
                 var bindAddr string
                 var schemesuffix string
-                if cert != nil </span><span class="cov6" title="7">{
+                if cert != nil </span><span class="cov5" title="7">{
                         schemesuffix = "s"
-                        if bindAddr, err = normalizeListenAddr(listenAddr, "443", "8443"); err == nil </span><span class="cov6" title="7">{
+                        if bindAddr, err = normalizeListenAddr(listenAddr, "443", "8443"); err == nil </span><span class="cov5" title="7">{
                                 l, err = tls.Listen(
                                         "tcp", bindAddr,
                                         &amp;tls.Config{
@@ -570,53 +572,53 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
                                 l, err = net.Listen("tcp", bindAddr)
                         }</span>
                 }
-                <span class="cov8" title="19">if l != nil </span><span class="cov8" title="14">{
-                        if listenUrl = overrideUrl; listenUrl == "" </span><span class="cov8" title="14">{
+                <span class="cov8" title="19">if l != nil </span><span class="cov7" title="14">{
+                        if listenUrl = overrideUrl; listenUrl == "" </span><span class="cov7" title="14">{
                                 listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenUrlString(l, cert))
                         }</span>
                 }
         }
-        <span class="cov9" title="21">return</span>
+        <span class="cov8" title="21">return</span>
 }
 
-func normalizeListenAddr(address, defaultpriv, defaultother string) (result string, err error) <span class="cov10" title="29">{
-        if _, _, err = net.SplitHostPort(address); err == nil </span><span class="cov9" title="20">{
-                // host and port both present
+func normalizeListenAddr(address, defaultpriv, defaultother string) (string, error) <span class="cov10" title="35">{
+        // A complete "host:port" (including "[v6]:port" and ":port") is kept as-is.
+        // The empty bracketed host "[]" is the one exception: unlike a port-only
+        // ":port" it is never a valid host.
+        if _, _, err := net.SplitHostPort(address); err == nil </span><span class="cov8" title="20">{
                 if strings.HasPrefix(address, "[]") </span><span class="cov4" title="4">{
-                        err = net.InvalidAddrError(address)
-                }</span> else<span class="cov8" title="16"> {
-                        result = address
+                        return "", net.InvalidAddrError(address)
                 }</span>
-                <span class="cov9" title="20">return</span>
+                <span class="cov8" title="16">return address, nil</span>
         }
 
-        <span class="cov6" title="9">err = nil
-        defaultPort := defaultListenPort(os.Geteuid(), defaultpriv, defaultother)
-
-        result = address
-        if strings.HasPrefix(address, "[") </span><span class="cov5" title="6">{
-                if len(address) &gt; 2 &amp;&amp; strings.HasSuffix(address, "]") </span><span class="cov1" title="1">{
-                        result = address[1 : len(address)-1]
-                }</span> else<span class="cov5" title="5"> {
-                        result = ""
-                        err = net.InvalidAddrError(address)
+        // No port: address is a bare host. A leading "[" must wrap a valid IP
+        // literal (net.JoinHostPort re-brackets it below); anything else, such as
+        // an unterminated "[::1" or a bracketed non-literal "[localhost]", is
+        // rejected rather than turned into a bogus bind address.
+        <span class="cov7" title="15">host := address
+        if inner, ok := strings.CutPrefix(host, "["); ok </span><span class="cov7" title="12">{
+                lit, closed := strings.CutSuffix(inner, "]")
+                if !closed </span><span class="cov2" title="2">{
+                        return "", net.InvalidAddrError(address)
                 }</span>
+                <span class="cov6" title="10">if _, err := netip.ParseAddr(lit); err != nil </span><span class="cov6" title="8">{
+                        return "", net.InvalidAddrError(address)
+                }</span>
+                <span class="cov2" title="2">host = lit</span>
         }
-        <span class="cov6" title="9">if err == nil </span><span class="cov4" title="4">{
-                result = net.JoinHostPort(result, defaultPort)
-        }</span>
-        <span class="cov6" title="9">return</span>
+        <span class="cov5" title="5">return net.JoinHostPort(host, defaultListenPort(os.Geteuid(), defaultpriv, defaultother)), nil</span>
 }
 
-func defaultListenPort(euid int, defaultpriv, defaultother string) (port string) <span class="cov7" title="12">{
+func defaultListenPort(euid int, defaultpriv, defaultother string) (port string) <span class="cov6" title="8">{
         port = defaultother
         if euid == 0 </span><span class="cov1" title="1">{
                 port = defaultpriv
         }</span>
-        <span class="cov7" title="12">return</span>
+        <span class="cov6" title="8">return</span>
 }
 
-func localhostOrDNSName(cert *tls.Certificate) string <span class="cov9" title="23">{
+func localhostOrDNSName(cert *tls.Certificate) string <span class="cov8" title="23">{
         if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span><span class="cov7" title="12">{
                 name := cert.Leaf.DNSNames[0]
                 if host, _, err := net.SplitHostPort(name); err == nil </span><span class="cov6" title="8">{
@@ -624,7 +626,7 @@ func localhostOrDNSName(cert *tls.Certificate) string <span class="cov9" title="
                 }</span>
                 // Guard against a certificate whose first DNS name is empty (or strips
                 // to empty): an empty host would build an unconnectable ":port" URL.
-                <span class="cov7" title="12">if name != "" </span><span class="cov7" title="10">{
+                <span class="cov7" title="12">if name != "" </span><span class="cov6" title="10">{
                         return name
                 }</span>
         }
@@ -709,33 +711,34 @@ import (
 // defaultSuffix is not empty it returns the absolute joined path
 // of [os.UserConfigDir] and defaultSuffix.
 //
-// It will expand environment variables in the path before evaluating the
-// absolute path. If expansion collapses the path to empty (for example a lone
-// "$VAR" whose variable is unset), the result is empty rather than the current
-// working directory.
+// It expands environment variables in the caller-supplied dataDir and
+// defaultSuffix before evaluating the absolute path. The [os.UserConfigDir]
+// base is system-provided and is not expanded, so a literal "$" in it survives.
+// If expansion collapses the path to empty (for example a lone "$VAR" whose
+// variable is unset), the result is empty rather than the current working
+// directory.
 //
 // dataDir and defaultSuffix may contain paths, ".." segments and symlinks.
 // They are not confined to the user config directory, so they may resolve
 // outside of it. Caller is responsible for validating or sandboxing untrusted
 // path input.
-func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <span class="cov10" title="13">{
-        result = dataDir
-        if result == "" </span><span class="cov7" title="7">{
-                if defaultSuffix != "" </span><span class="cov3" title="2">{
-                        if result, err = os.UserConfigDir(); err == nil </span><span class="cov3" title="2">{
-                                result = filepath.Join(result, defaultSuffix)
-                        }</span>
-                }
-        }
-        <span class="cov10" title="13">if err == nil &amp;&amp; result != "" </span><span class="cov8" title="8">{
-                // Re-check after expansion: a non-empty input may expand to empty
-                // (e.g. "$HOME" with HOME unset), and filepath.Abs("") would resolve
-                // to the current working directory rather than leaving result empty.
-                if result = os.ExpandEnv(result); result != "" </span><span class="cov7" title="6">{
-                        result, err = filepath.Abs(result)
+func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <span class="cov10" title="14">{
+        // A non-empty dataDir suppresses the defaultSuffix fallback even if it later
+        // expands to empty, so the emptiness test uses the raw (unexpanded) value.
+        if dataDir != "" </span><span class="cov7" title="6">{
+                result = os.ExpandEnv(dataDir)
+        }</span> else<span class="cov8" title="8"> if defaultSuffix != "" </span><span class="cov4" title="3">{
+                if result, err = os.UserConfigDir(); err == nil </span><span class="cov4" title="3">{
+                        result = filepath.Join(result, os.ExpandEnv(defaultSuffix))
                 }</span>
         }
-        <span class="cov10" title="13">return</span>
+        <span class="cov10" title="14">if err == nil &amp;&amp; result != "" </span><span class="cov7" title="7">{
+                // A non-empty input may expand to empty (e.g. "$HOME" with HOME unset);
+                // filepath.Abs("") would resolve to the current working directory rather
+                // than leaving result empty, so guard against it.
+                result, err = filepath.Abs(result)
+        }</span>
+        <span class="cov10" title="14">return</span>
 }
 
 // UseDataDir transforms dataDir into an absolute path. Then, if mode
