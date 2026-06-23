@@ -27,8 +27,10 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) {
 	if dataDir != "" {
 		result = os.ExpandEnv(dataDir)
 	} else if defaultSuffix != "" {
-		if result, err = os.UserConfigDir(); err == nil {
-			result = filepath.Join(result, os.ExpandEnv(defaultSuffix))
+		if defaultSuffix = os.ExpandEnv(defaultSuffix); defaultSuffix != "" {
+			if result, err = os.UserConfigDir(); err == nil {
+				result = filepath.Join(result, defaultSuffix)
+			}
 		}
 	}
 	if err == nil && result != "" {

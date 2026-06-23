@@ -70,6 +70,18 @@ func TestDefaultDataDir_ExpandToEmptyIsNotCwd(t *testing.T) {
 	}
 }
 
+func TestDefaultDataDir_DefaultSuffixExpandToEmptyIsEmpty(t *testing.T) {
+	t.Setenv("WEBSERV_TEST_UNSET", "")
+
+	got, err := webserv.DefaultDataDir("", "$WEBSERV_TEST_UNSET")
+	if err != nil {
+		t.Fatalf("DefaultDataDir(%q, %q) error: %v", "", "$WEBSERV_TEST_UNSET", err)
+	}
+	if got != "" {
+		t.Fatalf("DefaultDataDir(%q, %q) = %q, want empty string", "", "$WEBSERV_TEST_UNSET", got)
+	}
+}
+
 func TestDefaultDataDir_DoesNotExpandUserConfigDir(t *testing.T) {
 	// The os.UserConfigDir base is system-provided: a literal "$" in it (a valid
 	// path character) must not be passed through os.ExpandEnv. Only the
