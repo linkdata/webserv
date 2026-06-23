@@ -210,18 +210,24 @@ type Config struct {
         Logger               Logger        // logger to use, if nil logs nothing
 }
 
-func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov10" title="26">{
+func (cfg *Config) logInfo(msg string, keyValuePairs ...any) <span class="cov10" title="29">{
         if cfg.Logger != nil </span><span class="cov7" title="12">{
                 cfg.Logger.Info("webserv: "+msg, keyValuePairs...)
         }</span>
 }
 
-func (cfg *Config) shutdownTimeLimit() (limit time.Duration) <span class="cov6" title="7">{
+func (cfg *Config) shutdownTimeLimit() (limit time.Duration) <span class="cov6" title="8">{
         if limit = cfg.ShutdownTimeLimit; limit == 0 </span><span class="cov4" title="4">{
                 limit = defaultShutdownTimeLimit
         }</span>
-        <span class="cov6" title="7">return</span>
+        <span class="cov6" title="8">return</span>
 }
+
+func isCleanServerClosed(err error) bool <span class="cov8" title="17">{
+        // A recovered panic may wrap http.ErrServerClosed; only the exact sentinel
+        // returned by http.Server.Serve represents a clean shutdown.
+        return err == http.ErrServerClosed
+}</span>
 
 // Listen performs initial setup for a simple web server and returns a
 // [net.Listener] if successful.
@@ -298,64 +304,64 @@ func (cfg *Config) Listen() (l net.Listener, err error) <span class="cov7" title
 //
 // Panics if ctx, srv or l is nil. Panics from srv.Serve are recovered and
 // returned as an error matching [ErrServePanic].
-func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov7" title="12">{
+func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) <span class="cov8" title="14">{
         if ctx == nil </span><span class="cov1" title="1">{
                 panic("webserv: nil context.Context")</span>
         }
-        <span class="cov7" title="11">if srv == nil </span><span class="cov1" title="1">{
+        <span class="cov7" title="13">if srv == nil </span><span class="cov1" title="1">{
                 panic("webserv: nil http.Server")</span>
         }
-        <span class="cov7" title="10">if l == nil </span><span class="cov1" title="1">{
+        <span class="cov7" title="12">if l == nil </span><span class="cov1" title="1">{
                 panic("webserv: nil net.Listener")</span>
         }
-        <span class="cov7" title="9">serveErr := make(chan error, 1)
+        <span class="cov7" title="11">serveErr := make(chan error, 1)
         sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
         defer stop()
-        if !cfg.LogTLSErrors </span><span class="cov6" title="8">{
+        if !cfg.LogTLSErrors </span><span class="cov7" title="10">{
                 // Install the filter before serving so the single write to
                 // srv.ErrorLog happens-before any connection goroutine reads it.
                 installTLSErrorLogFilter(srv)
         }</span>
-        <span class="cov7" title="9">cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
-        go func() </span><span class="cov7" title="9">{
-                defer func() </span><span class="cov7" title="9">{
-                        if p := recover(); p != nil </span><span class="cov2" title="2">{
+        <span class="cov7" title="11">cfg.logInfo("listening on", "address", l.Addr(), "url", cfg.ListenURL)
+        go func() </span><span class="cov7" title="11">{
+                defer func() </span><span class="cov7" title="11">{
+                        if p := recover(); p != nil </span><span class="cov4" title="4">{
                                 serveErr &lt;- newErrServePanic(p)
                         }</span>
                 }()
-                <span class="cov7" title="9">serveErr &lt;- srv.Serve(l)</span>
+                <span class="cov7" title="11">serveErr &lt;- srv.Serve(l)</span>
         }()
-        <span class="cov7" title="9">select </span>{
-        case err = &lt;-serveErr:<span class="cov4" title="4"></span>
-        case &lt;-sigCtx.Done():<span class="cov5" title="5">
+        <span class="cov7" title="11">select </span>{
+        case err = &lt;-serveErr:<span class="cov5" title="5"></span>
+        case &lt;-sigCtx.Done():<span class="cov5" title="6">
                 err = ctx.Err()
                 var reason error
-                if reason = context.Cause(ctx); reason == nil </span><span class="cov4" title="4">{
+                if reason = context.Cause(ctx); reason == nil </span><span class="cov5" title="5">{
                         reason = context.Cause(sigCtx)
                 }</span>
-                <span class="cov5" title="5">stop()
+                <span class="cov5" title="6">stop()
                 cfg.logInfo("stopped", "reason", reason)
                 shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.shutdownTimeLimit())
                 shutdownErr := srv.Shutdown(shutdownCtx)
                 shutdownCancel()
                 serveExitErr := &lt;-serveErr
-                if errors.Is(serveExitErr, http.ErrServerClosed) </span><span class="cov4" title="4">{
+                if isCleanServerClosed(serveExitErr) </span><span class="cov4" title="4">{
                         serveExitErr = nil
                 }</span>
-                <span class="cov5" title="5">if err == nil </span><span class="cov4" title="4">{
+                <span class="cov5" title="6">if err == nil </span><span class="cov5" title="5">{
                         if shutdownErr != nil </span><span class="cov2" title="2">{
                                 err = shutdownErr
-                        }</span> else<span class="cov2" title="2"> {
+                        }</span> else<span class="cov3" title="3"> {
                                 err = serveExitErr
                         }</span>
                 } else<span class="cov1" title="1"> if serveExitErr != nil </span><span class="cov0" title="0">{
                         err = errors.Join(err, serveExitErr)
                 }</span>
         }
-        <span class="cov7" title="9">if errors.Is(err, http.ErrServerClosed) </span><span class="cov4" title="3">{
+        <span class="cov7" title="11">if isCleanServerClosed(err) </span><span class="cov3" title="3">{
                 err = nil
         }</span>
-        <span class="cov7" title="9">return err</span>
+        <span class="cov7" title="11">return err</span>
 }
 
 // Serve creates an [net/http.Server] with reasonable defaults and calls
@@ -390,7 +396,7 @@ func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handl
 // return means the server started successfully and then shut down cleanly.
 //
 // Panics if ctx is nil.
-func (cfg *Config) ListenAndServe(ctx context.Context, handler http.Handler) (err error) <span class="cov4" title="3">{
+func (cfg *Config) ListenAndServe(ctx context.Context, handler http.Handler) (err error) <span class="cov3" title="3">{
         if ctx == nil </span><span class="cov1" title="1">{
                 panic("webserv: nil context.Context")</span>
         }
@@ -456,7 +462,7 @@ type tlsErrorLogWriter struct {
 func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov7" title="5">{
         if !bytes.HasPrefix(p, tlsHandshakeErrorLogPrefixBytes) </span><span class="cov5" title="3">{
                 // Preserve file attribution for loggers using Lshortfile or Llongfile.
-                if w.previous != nil </span><span class="cov4" title="2">{
+                if w.previous != nil </span><span class="cov3" title="2">{
                         err = w.previous.Output(4, string(p))
                 }</span> else<span class="cov1" title="1"> {
                         err = log.Output(4, string(p))
@@ -476,7 +482,7 @@ func (w tlsErrorLogWriter) Write(p []byte) (n int, err error) <span class="cov7"
 // [net/http.Server.Serve] starts. Doing so orders the write before every
 // connection goroutine that later reads srv.ErrorLog, so the filter is never
 // mutated again while connections are being served or drained.
-func installTLSErrorLogFilter(srv *http.Server) <span class="cov10" title="8">{
+func installTLSErrorLogFilter(srv *http.Server) <span class="cov10" title="10">{
         srv.ErrorLog = log.New(tlsErrorLogWriter{previous: srv.ErrorLog}, "", 0)
 }</span>
 </pre>
@@ -493,25 +499,25 @@ type errServePanic struct {
 // ErrServePanic matches errors returned by [Config.ServeWith] when srv.Serve panics.
 var ErrServePanic = errServePanic{}
 
-func (e errServePanic) Error() string <span class="cov5" title="3">{
+func (e errServePanic) Error() string <span class="cov6" title="3">{
         return fmt.Sprintf("ServeWith(): panic in http.Server.Serve: %v", e.recovered)
 }</span>
 
-func (e errServePanic) Is(other error) (yes bool) <span class="cov10" title="8">{
+func (e errServePanic) Is(other error) (yes bool) <span class="cov10" title="7">{
         _, yes = other.(errServePanic)
         return
 }</span>
 
-func (e errServePanic) Unwrap() error <span class="cov8" title="6">{
+func (e errServePanic) Unwrap() error <span class="cov6" title="3">{
         return e.err
 }</span>
 
-func newErrServePanic(recovered any) error <span class="cov7" title="4">{
+func newErrServePanic(recovered any) error <span class="cov9" title="6">{
         var err error
-        if recoveredError, ok := recovered.(error); ok </span><span class="cov5" title="3">{
+        if recoveredError, ok := recovered.(error); ok </span><span class="cov8" title="5">{
                 err = recoveredError
         }</span>
-        <span class="cov7" title="4">return errServePanic{
+        <span class="cov9" title="6">return errServePanic{
                 recovered: recovered,
                 err:       err,
         }</span>
