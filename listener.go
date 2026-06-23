@@ -62,7 +62,7 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 }
 
 func normalizeListenAddr(address, defaultpriv, defaultother string) (string, error) {
-	// A complete "host:port" (including "[v6]:port" and ":port") is kept as-is.
+	// A complete "host:port" (including "[host]:port" and ":port") is kept as-is.
 	// The empty bracketed host "[]" is the one exception: unlike a port-only
 	// ":port" it is never a valid host.
 	if _, _, err := net.SplitHostPort(address); err == nil {
@@ -73,9 +73,8 @@ func normalizeListenAddr(address, defaultpriv, defaultother string) (string, err
 	}
 
 	// No port: address is a bare host. A leading "[" must wrap a valid IP
-	// literal (net.JoinHostPort re-brackets it below); anything else, such as
-	// an unterminated "[::1" or a bracketed non-literal "[localhost]", is
-	// rejected rather than turned into a bogus bind address.
+	// literal so net.JoinHostPort can re-bracket it below; otherwise reject it
+	// rather than turning it into a bogus bind address.
 	host := address
 	if inner, ok := strings.CutPrefix(host, "["); ok {
 		lit, closed := strings.CutSuffix(inner, "]")

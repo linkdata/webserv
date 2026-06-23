@@ -48,9 +48,8 @@ func TestNormalizeListenAddr_BracketedIPv6WithoutPort(t *testing.T) {
 }
 
 func TestNormalizeListenAddr_MalformedBracketHostRejected(t *testing.T) {
-	// Brackets must wrap a valid IP literal. Besides the empty/unterminated
-	// cases, this rejects bracketed non-literals ("[localhost]") and surplus
-	// brackets ("[]]", "[[::1]]") that would otherwise build a bogus address.
+	// Without a port, brackets must wrap a valid IP literal. Besides empty or
+	// unterminated cases, reject bracketed non-literals and surplus brackets.
 	for _, in := range []string{"[]", "[]:", "[]:0", "[::1", "[]]", "[[::1]]", "[localhost]"} {
 		got, err := normalizeListenAddr(in, "80", "8080")
 		if err == nil {
