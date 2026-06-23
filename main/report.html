@@ -623,31 +623,31 @@ func defaultListenPort(euid int, defaultpriv, defaultother string) (port string)
         <span class="cov6" title="8">return</span>
 }
 
-func localhostOrDNSName(cert *tls.Certificate) string <span class="cov8" title="23">{
-        if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span><span class="cov7" title="12">{
+func localhostOrDNSName(cert *tls.Certificate) string <span class="cov9" title="25">{
+        if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span><span class="cov7" title="14">{
                 name := cert.Leaf.DNSNames[0]
                 if host, _, err := net.SplitHostPort(name); err == nil </span><span class="cov6" title="8">{
                         name = host
                 }</span>
-                // Guard against a certificate whose first DNS name is empty (or strips
-                // to empty): an empty host would build an unconnectable ":port" URL.
-                <span class="cov7" title="12">if name != "" </span><span class="cov6" title="10">{
+                // Guard against a certificate whose first DNS name is empty, strips to
+                // empty, or is a wildcard: those would build an unconnectable URL host.
+                <span class="cov7" title="14">if name != "" &amp;&amp; !strings.Contains(name, "*") </span><span class="cov6" title="10">{
                         return name
                 }</span>
         }
-        <span class="cov7" title="13">return "localhost"</span>
+        <span class="cov7" title="15">return "localhost"</span>
 }
 
-func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) <span class="cov8" title="16">{
+func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) <span class="cov8" title="17">{
         addr = l.Addr().String()
-        if host, port, err := net.SplitHostPort(addr); err == nil </span><span class="cov8" title="16">{
-                if ip := net.ParseIP(host); ip != nil </span><span class="cov8" title="16">{
-                        if ip.IsUnspecified() || ip.IsLoopback() </span><span class="cov8" title="16">{
+        if host, port, err := net.SplitHostPort(addr); err == nil </span><span class="cov8" title="17">{
+                if ip := net.ParseIP(host); ip != nil </span><span class="cov8" title="17">{
+                        if ip.IsUnspecified() || ip.IsLoopback() </span><span class="cov8" title="17">{
                                 addr = net.JoinHostPort(localhostOrDNSName(cert), port)
                         }</span>
                 }
         }
-        <span class="cov8" title="16">return</span>
+        <span class="cov8" title="17">return</span>
 }
 </pre>
 		
