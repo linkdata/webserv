@@ -763,6 +763,33 @@ func TestConfigServeWith_SignalPathDoesNotDuplicateServeError(t *testing.T) {
 	}
 }
 
+func TestConfigServeWith_CanceledContextJoinsServeError(t *testing.T) {
+	l := newPanicAfterCloseListener()
+	cfg := &webserv.Config{ShutdownTimeLimit: 200 * time.Millisecond}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- cfg.ServeWith(ctx, &http.Server{}, l) }()
+
+	<-l.accepted // Serve is blocked in Accept; canceling ctx starts shutdown.
+	cancel()
+
+	var err error
+	select {
+	case err = <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("ServeWith() did not return after context cancellation")
+	}
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("ServeWith() error = %v, want match %v", err, context.Canceled)
+	}
+	if !errors.Is(err, webserv.ErrServePanic) {
+		t.Fatalf("ServeWith() error = %v, want match %v", err, webserv.ErrServePanic)
+	}
+}
+
 func TestConfigServeWith_SignalPathRecoversServerClosedPanic(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("process signalling from tests is not reliable on windows")
