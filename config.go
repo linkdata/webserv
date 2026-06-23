@@ -47,6 +47,12 @@ func (cfg *Config) shutdownTimeLimit() (limit time.Duration) {
 	return
 }
 
+func isCleanServerClosed(err error) bool {
+	// A recovered panic may wrap http.ErrServerClosed; only the exact sentinel
+	// returned by http.Server.Serve represents a clean shutdown.
+	return err == http.ErrServerClosed
+}
+
 // Listen performs initial setup for a simple web server and returns a
 // [net.Listener] if successful.
 //
@@ -163,7 +169,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 		shutdownErr := srv.Shutdown(shutdownCtx)
 		shutdownCancel()
 		serveExitErr := <-serveErr
-		if errors.Is(serveExitErr, http.ErrServerClosed) {
+		if isCleanServerClosed(serveExitErr) {
 			serveExitErr = nil
 		}
 		if err == nil {
@@ -176,7 +182,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 			err = errors.Join(err, serveExitErr)
 		}
 	}
-	if errors.Is(err, http.ErrServerClosed) {
+	if isCleanServerClosed(err) {
 		err = nil
 	}
 	return err
