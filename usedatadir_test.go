@@ -70,6 +70,31 @@ func TestDefaultDataDir_ExpandToEmptyIsNotCwd(t *testing.T) {
 	}
 }
 
+func TestDefaultDataDir_DoesNotExpandUserConfigDir(t *testing.T) {
+	// The os.UserConfigDir base is system-provided: a literal "$" in it (a valid
+	// path character) must not be passed through os.ExpandEnv. Only the
+	// caller-supplied suffix is expanded.
+	configHome := filepath.Join(t.TempDir(), "cfg$svc")
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("svc", "WRONGLY_EXPANDED")
+
+	base, err := os.UserConfigDir()
+	if err != nil {
+		t.Skipf("UserConfigDir unavailable: %v", err)
+	}
+	if base != configHome {
+		t.Skipf("UserConfigDir does not honor XDG_CONFIG_HOME on this platform: %q", base)
+	}
+
+	got, err := webserv.DefaultDataDir("", "myapp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(base, "myapp"); got != want {
+		t.Fatalf("DefaultDataDir mangled UserConfigDir:\n got  = %q\n want = %q", got, want)
+	}
+}
+
 func TestUseDataDir(t *testing.T) {
 	got, err := webserv.UseDataDir(".", 0o750)
 	if err != nil {
