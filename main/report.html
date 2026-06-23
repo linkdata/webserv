@@ -727,23 +727,25 @@ import (
 // They are not confined to the user config directory, so they may resolve
 // outside of it. Caller is responsible for validating or sandboxing untrusted
 // path input.
-func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <span class="cov10" title="14">{
+func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <span class="cov10" title="15">{
         // A non-empty dataDir suppresses the defaultSuffix fallback even if it later
         // expands to empty, so the emptiness test uses the raw (unexpanded) value.
-        if dataDir != "" </span><span class="cov7" title="6">{
+        if dataDir != "" </span><span class="cov6" title="6">{
                 result = os.ExpandEnv(dataDir)
-        }</span> else<span class="cov8" title="8"> if defaultSuffix != "" </span><span class="cov4" title="3">{
-                if result, err = os.UserConfigDir(); err == nil </span><span class="cov4" title="3">{
-                        result = filepath.Join(result, os.ExpandEnv(defaultSuffix))
-                }</span>
+        }</span> else<span class="cov8" title="9"> if defaultSuffix != "" </span><span class="cov5" title="4">{
+                if defaultSuffix = os.ExpandEnv(defaultSuffix); defaultSuffix != "" </span><span class="cov4" title="3">{
+                        if result, err = os.UserConfigDir(); err == nil </span><span class="cov4" title="3">{
+                                result = filepath.Join(result, defaultSuffix)
+                        }</span>
+                }
         }
-        <span class="cov10" title="14">if err == nil &amp;&amp; result != "" </span><span class="cov7" title="7">{
+        <span class="cov10" title="15">if err == nil &amp;&amp; result != "" </span><span class="cov7" title="7">{
                 // A non-empty input may expand to empty (e.g. "$HOME" with HOME unset);
                 // filepath.Abs("") would resolve to the current working directory rather
                 // than leaving result empty, so guard against it.
                 result, err = filepath.Abs(result)
         }</span>
-        <span class="cov10" title="14">return</span>
+        <span class="cov10" title="15">return</span>
 }
 
 // UseDataDir transforms dataDir into an absolute path. Then, if mode
@@ -753,7 +755,7 @@ func DefaultDataDir(dataDir, defaultSuffix string) (result string, err error) <s
 // dataDir is empty. Does not expand environment variables in the path.
 //
 // Returns the final path or an empty string if dataDir was empty.
-func UseDataDir(dataDir string, mode fs.FileMode) (string, error) <span class="cov8" title="8">{
+func UseDataDir(dataDir string, mode fs.FileMode) (string, error) <span class="cov7" title="8">{
         var err error
         if dataDir != "" </span><span class="cov5" title="4">{
                 if dataDir, err = filepath.Abs(dataDir); err == nil </span><span class="cov5" title="4">{
@@ -762,7 +764,7 @@ func UseDataDir(dataDir string, mode fs.FileMode) (string, error) <span class="c
                         }</span>
                 }
         }
-        <span class="cov8" title="8">return dataDir, err</span>
+        <span class="cov7" title="8">return dataDir, err</span>
 }
 </pre>
 		
