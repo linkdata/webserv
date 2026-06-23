@@ -172,8 +172,9 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 			} else {
 				err = serveExitErr
 			}
+		} else if serveExitErr != nil {
+			err = errors.Join(err, serveExitErr)
 		}
-		err = errors.Join(err, serveExitErr)
 	}
 	if errors.Is(err, http.ErrServerClosed) {
 		err = nil

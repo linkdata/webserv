@@ -47,6 +47,38 @@ func (panicListener) Addr() net.Addr {
 	return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)}
 }
 
+// panicAfterCloseListener blocks Accept until Close, then panics.
+//
+// When ServeWith catches a signal it triggers srv.Shutdown, which closes the
+// listener; Accept then panics and the recovered ErrServePanic reaches
+// ServeWith as a non-clean serve-exit error while the parent context is still
+// alive. That is the signal branch with err == nil, which must surface the
+// serve error exactly once.
+type panicAfterCloseListener struct {
+	closed   chan struct{}
+	accepted chan struct{}
+	once     sync.Once
+}
+
+func newPanicAfterCloseListener() *panicAfterCloseListener {
+	return &panicAfterCloseListener{closed: make(chan struct{}), accepted: make(chan struct{})}
+}
+
+func (l *panicAfterCloseListener) Accept() (net.Conn, error) {
+	l.once.Do(func() { close(l.accepted) })
+	<-l.closed
+	panic(errors.New("accept panic after close"))
+}
+
+func (l *panicAfterCloseListener) Close() error {
+	close(l.closed)
+	return nil
+}
+
+func (l *panicAfterCloseListener) Addr() net.Addr {
+	return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)}
+}
+
 func newNotifyingLogger(w io.Writer, match string) *notifyingLogger {
 	return &notifyingLogger{
 		logger: slog.New(slog.NewTextHandler(w, nil)),
@@ -660,5 +692,41 @@ func TestConfigServeWith_SignalShutdownUsesConfigShutdownTimeLimit(t *testing.T)
 
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("ServeWith() error = %v, want %v", err, context.DeadlineExceeded)
+	}
+}
+
+// TestConfigServeWith_SignalPathDoesNotDuplicateServeError checks that a
+// signal-triggered shutdown which finds srv.Serve exiting with a non-clean
+// error returns that error once, not joined with itself.
+func TestConfigServeWith_SignalPathDoesNotDuplicateServeError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("process signalling from tests is not reliable on windows")
+	}
+	signalTestMu.Lock()
+	defer signalTestMu.Unlock()
+
+	l := newPanicAfterCloseListener()
+	cfg := &webserv.Config{ShutdownTimeLimit: 200 * time.Millisecond}
+
+	done := make(chan error, 1)
+	go func() { done <- cfg.ServeWith(t.Context(), &http.Server{}, l) }()
+
+	<-l.accepted // Serve is blocked in Accept; the parent context is still alive.
+	if err := signalSelf(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+
+	var err error
+	select {
+	case err = <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("ServeWith() did not return after SIGTERM")
+	}
+
+	if !errors.Is(err, webserv.ErrServePanic) {
+		t.Fatalf("ServeWith() error = %v, want match %v", err, webserv.ErrServePanic)
+	}
+	if n := strings.Count(err.Error(), "panic in http.Server.Serve"); n != 1 {
+		t.Fatalf("serve error appears %d times in %q, want once", n, err.Error())
 	}
 }
