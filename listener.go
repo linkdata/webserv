@@ -103,9 +103,9 @@ func localhostOrDNSName(cert *tls.Certificate) string {
 		if host, _, err := net.SplitHostPort(name); err == nil {
 			name = host
 		}
-		// Guard against a certificate whose first DNS name is empty (or strips
-		// to empty): an empty host would build an unconnectable ":port" URL.
-		if name != "" {
+		// Guard against a certificate whose first DNS name is empty, strips to
+		// empty, or is a wildcard: those would build an unconnectable URL host.
+		if name != "" && !strings.Contains(name, "*") {
 			return name
 		}
 	}

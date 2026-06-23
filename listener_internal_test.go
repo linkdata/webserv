@@ -124,6 +124,7 @@ func TestLocalhostOrDNSName(t *testing.T) {
 		// build an unconnectable ":port" URL). Only the first name is consulted.
 		{name: "empty first DNS name", cert: certWithDNSNames(""), want: "localhost"},
 		{name: "empty before non-empty", cert: certWithDNSNames("", "example.test"), want: "localhost"},
+		{name: "wildcard DNS name", cert: certWithDNSNames("*.example.test"), want: "localhost"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := localhostOrDNSName(tc.cert); got != tc.want {
@@ -152,5 +153,22 @@ func TestListenUrlString_UnspecifiedBindUsesCertDNSName(t *testing.T) {
 	}
 	if got, want := listenUrlString(l, nil), net.JoinHostPort("localhost", port); got != want {
 		t.Fatalf("listenUrlString() without cert = %q, want %q", got, want)
+	}
+}
+
+func TestListenUrlString_UnspecifiedBindSkipsWildcardCertDNSName(t *testing.T) {
+	l, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = l.Close() }()
+
+	_, port, err := net.SplitHostPort(l.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := listenUrlString(l, certWithDNSNames("*.example.test")), net.JoinHostPort("localhost", port); got != want {
+		t.Fatalf("listenUrlString() = %q, want %q", got, want)
 	}
 }
