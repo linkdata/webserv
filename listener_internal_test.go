@@ -48,7 +48,10 @@ func TestNormalizeListenAddr_BracketedIPv6WithoutPort(t *testing.T) {
 }
 
 func TestNormalizeListenAddr_MalformedBracketHostRejected(t *testing.T) {
-	for _, in := range []string{"[]", "[]:", "[]:0", "[::1"} {
+	// Brackets must wrap a valid IP literal. Besides the empty/unterminated
+	// cases, this rejects bracketed non-literals ("[localhost]") and surplus
+	// brackets ("[]]", "[[::1]]") that would otherwise build a bogus address.
+	for _, in := range []string{"[]", "[]:", "[]:0", "[::1", "[]]", "[[::1]]", "[localhost]"} {
 		got, err := normalizeListenAddr(in, "80", "8080")
 		if err == nil {
 			t.Fatalf("normalizeListenAddr(%q) = (%q, nil), want invalid address error", in, got)
@@ -60,10 +63,23 @@ func TestNormalizeListenAddr_MalformedBracketHostRejected(t *testing.T) {
 	}
 }
 
+func TestNormalizeListenAddr_BracketedZonedIPv6Accepted(t *testing.T) {
+	// A bracketed link-local literal with a zone is valid; netip.ParseAddr
+	// accepts the zone where net.ParseIP would not.
+	httpDefault := "80"
+	if os.Geteuid() != 0 {
+		httpDefault = "8080"
+	}
+	const in = "[fe80::1%eth0]"
+	if got, err := normalizeListenAddr(in, "80", "8080"); err != nil || got != in+":"+httpDefault {
+		t.Fatalf("normalizeListenAddr(%q) = (%q, %v), want (%q, nil)", in, got, err, in+":"+httpDefault)
+	}
+}
+
 func TestNormalizeListenAddr_MalformedBracketResultIsEmpty(t *testing.T) {
 	// A malformed bracket address must return an empty result alongside the
 	// error, never a usable address such as ":8080".
-	for _, in := range []string{"[]", "[::1"} {
+	for _, in := range []string{"[]", "[::1", "[]]", "[[::1]]"} {
 		got, err := normalizeListenAddr(in, "80", "8080")
 		if err == nil {
 			t.Fatalf("normalizeListenAddr(%q) = (%q, nil), want error", in, got)

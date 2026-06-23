@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"strings"
 )
@@ -60,33 +61,33 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 	return
 }
 
-func normalizeListenAddr(address, defaultpriv, defaultother string) (result string, err error) {
-	if _, _, err = net.SplitHostPort(address); err == nil {
-		// host and port both present
+func normalizeListenAddr(address, defaultpriv, defaultother string) (string, error) {
+	// A complete "host:port" (including "[v6]:port" and ":port") is kept as-is.
+	// The empty bracketed host "[]" is the one exception: unlike a port-only
+	// ":port" it is never a valid host.
+	if _, _, err := net.SplitHostPort(address); err == nil {
 		if strings.HasPrefix(address, "[]") {
-			err = net.InvalidAddrError(address)
-		} else {
-			result = address
+			return "", net.InvalidAddrError(address)
 		}
-		return
+		return address, nil
 	}
 
-	err = nil
-	defaultPort := defaultListenPort(os.Geteuid(), defaultpriv, defaultother)
-
-	result = address
-	if strings.HasPrefix(address, "[") {
-		if len(address) > 2 && strings.HasSuffix(address, "]") {
-			result = address[1 : len(address)-1]
-		} else {
-			result = ""
-			err = net.InvalidAddrError(address)
+	// No port: address is a bare host. A leading "[" must wrap a valid IP
+	// literal (net.JoinHostPort re-brackets it below); anything else, such as
+	// an unterminated "[::1" or a bracketed non-literal "[localhost]", is
+	// rejected rather than turned into a bogus bind address.
+	host := address
+	if inner, ok := strings.CutPrefix(host, "["); ok {
+		lit, closed := strings.CutSuffix(inner, "]")
+		if !closed {
+			return "", net.InvalidAddrError(address)
 		}
+		if _, err := netip.ParseAddr(lit); err != nil {
+			return "", net.InvalidAddrError(address)
+		}
+		host = lit
 	}
-	if err == nil {
-		result = net.JoinHostPort(result, defaultPort)
-	}
-	return
+	return net.JoinHostPort(host, defaultListenPort(os.Geteuid(), defaultpriv, defaultother)), nil
 }
 
 func defaultListenPort(euid int, defaultpriv, defaultother string) (port string) {
