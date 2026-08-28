@@ -27,21 +27,18 @@ type serverTLSListener struct {
 // Listener creates a [net.Listener] given an optional preferred address
 // and an optional directory containing certificate files.
 //
-// If certDir is not empty, it calls [LoadCert] to load fullchain.pem and privkey.pem.
+// If certDir is non-empty, it calls [LoadCert] with fullchainPem and privkeyPem.
 //
-// The listener will default to all addresses and standard port
-// depending on privileges and if a certificate was loaded or not.
+// Unless listenAddr overrides them, the listener uses all addresses and a
+// standard port based on privileges and whether a certificate was loaded. Use
+// an address like ":8080" to specify only a port.
 //
-// These defaults can be overridden with the listenAddr argument.
-// To specify only a port, use an address like ":8080".
+// Wrapping a returned TLS listener prevents [Config.ServeWith] from
+// synchronizing its HTTP/2 policy at serve time.
 //
-// Pass a returned TLS listener directly to [Config.ServeWith]; wrapping it
-// prevents serve-time HTTP/2 policy synchronization and retains the protocol
-// list established here.
-//
-// Returns the [net.Listener] and listenURL if there was no error.
-// absCertDir is the resolved absolute path to certDir whenever certDir was
-// non-empty and could be resolved, even if loading the certificate then failed.
+// On success, it returns l and listenURL. If certDir is non-empty and resolves
+// successfully, absCertDir contains its absolute path even when certificate
+// loading fails.
 func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) {
 	var cert *tls.Certificate
 	if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil {

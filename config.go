@@ -123,11 +123,10 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 
 // ServeWith serves requests with srv on l and handles controlled shutdown.
 //
-// For a TLS listener passed directly from [Listener], it calls
-// [net/http.Server.ServeTLS] so net/http applies srv's HTTP protocol policy
-// during TLS negotiation. The listener's TLS configuration replaces
-// srv.TLSConfig and is not restored. Other listeners are passed to
-// [net/http.Server.Serve].
+// TLS listeners passed directly from [Listener] use [net/http.Server.ServeTLS],
+// so net/http applies srv's HTTP protocol policy during negotiation. The
+// listener's TLS configuration replaces srv.TLSConfig and is not restored.
+// Other listeners use [net/http.Server.Serve].
 //
 // ServeWith catches SIGINT and SIGTERM. A controlled shutdown is triggered by
 // either signal or by ctx being canceled, using [net/http.Server.Shutdown]
