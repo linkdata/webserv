@@ -16,6 +16,8 @@ const (
 	PrivkeyPem = "privkey.pem"
 )
 
+// serverTLSListener keeps both views of one socket: direct callers accept from
+// the embedded TLS listener, while Config.ServeWith serves from raw.
 type serverTLSListener struct {
 	net.Listener
 	raw       net.Listener
@@ -32,6 +34,10 @@ type serverTLSListener struct {
 //
 // These defaults can be overridden with the listenAddr argument.
 // To specify only a port, use an address like ":8080".
+//
+// Pass a returned TLS listener directly to [Config.ServeWith]; wrapping it
+// prevents serve-time HTTP/2 policy synchronization and retains the protocol
+// list established here.
 //
 // Returns the [net.Listener] and listenURL if there was no error.
 // absCertDir is the resolved absolute path to certDir whenever certDir was

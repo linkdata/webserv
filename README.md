@@ -27,6 +27,7 @@ Wiring up `http.Server` and `net.Listener` by hand is easy to get subtly wrong. 
 * **Drops privileges safely (Unix only).** Bind to a privileged port (80/443) as root, then switch to an unprivileged `User`. Supplementary groups, GID and UID are dropped in the correct order (`setgroups` → `setgid` → `setuid`), `HOME` and `USER` are set to match the target user, and `XDG_CONFIG_HOME` is unset so config-dir lookups follow the new `HOME`.
 * **Sane timeouts by default.** `Serve` sets `ReadHeaderTimeout` and `IdleTimeout`. A bare `http.Server{}` has no timeouts at all, leaving it open to Slowloris-style connection exhaustion.
 * **TLS 1.3 minimum.** When a certificate is loaded, the listener pins `MinVersion` to TLS 1.3 instead of relying on the standard library default.
+* **Server-controlled HTTP/2.** TLS listeners passed directly from `Listener` honor the server's HTTP/2 policy (`http.Server.Protocols`, `GODEBUG=http2server`) when serving begins.
 * **Quiet TLS handshake errors.** Failed handshakes (port scanners, plain HTTP sent to an HTTPS port) no longer flood your logs by default; set `LogTLSErrors` to keep them.
 * **Recovers serve panics.** A panic while serving is recovered and returned as an error matching `ErrServePanic` instead of taking down the process.
 
