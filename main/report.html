@@ -226,8 +226,19 @@ func (cfg *Config) shutdownTimeLimit() (limit time.Duration) {
 func isCleanServerClosed(err error) bool {
         // A recovered panic may wrap http.ErrServerClosed; only the exact sentinel
         // returned by http.Server.Serve represents a clean shutdown.
-        <span class="cov8" title="23">return err == http.ErrServerClosed
+        <span class="cov8" title="18">return err == http.ErrServerClosed
 </span>}
+
+func resolveServeError(ctxErr, serveErr error) (err error) {
+        <span class="cov6" title="9">if isCleanServerClosed(serveErr) </span>{
+                <span class="cov5" title="5">serveErr = nil
+</span>        }
+        <span class="cov6" title="9">err = serveErr
+        if ctxErr != nil </span>{
+                <span class="cov2" title="2">err = errors.Join(ctxErr, serveErr)
+</span>        }
+        <span class="cov6" title="9">return</span>
+}
 
 func serveServer(srv *http.Server, l net.Listener) (err error) {
         <span class="cov7" title="14">if tlsListener, ok := l.(*serverTLSListener); ok </span>{
@@ -353,7 +364,8 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
                 <span class="cov7" title="14">serveErr &lt;- serveServer(srv, l)</span>
         }()
         <span class="cov7" title="14">select </span>{
-        case err = &lt;-serveErr:<span class="cov5" title="5"></span>
+        case err = &lt;-serveErr:
+                <span class="cov5" title="5">err = resolveServeError(ctx.Err(), err)</span>
         case &lt;-sigCtx.Done():
                 <span class="cov6" title="9">err = ctx.Err()
                 var reason error
@@ -379,9 +391,6 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
                         <span class="cov1" title="1">err = errors.Join(err, serveExitErr)
 </span>                }
         }
-        <span class="cov7" title="14">if isCleanServerClosed(err) </span>{
-                <span class="cov3" title="3">err = nil
-</span>        }
         <span class="cov7" title="14">return err</span>
 }
 
