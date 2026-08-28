@@ -320,6 +320,9 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 // bounded by [Config.ShutdownTimeLimit] (or 1 second when
 // [Config.ShutdownTimeLimit] is zero).
 //
+// The logged shutdown reason follows [os/signal.NotifyContext]. Go 1.25 reports
+// a received signal as [context.Canceled].
+//
 // The returned error depends on what ended serving:
 //   - a clean shutdown returns nil ([net/http.ErrServerClosed] is mapped to nil);
 //   - if ctx was canceled, it returns an error matching ctx.Err(); if serving
