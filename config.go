@@ -53,6 +53,17 @@ func isCleanServerClosed(err error) bool {
 	return err == http.ErrServerClosed
 }
 
+func resolveServeError(ctxErr, serveErr error) (err error) {
+	if isCleanServerClosed(serveErr) {
+		serveErr = nil
+	}
+	err = serveErr
+	if ctxErr != nil {
+		err = errors.Join(ctxErr, serveErr)
+	}
+	return
+}
+
 func serveServer(srv *http.Server, l net.Listener) (err error) {
 	if tlsListener, ok := l.(*serverTLSListener); ok {
 		// Keep the embedded TLS listener's config isolated from ServeTLS, whose
@@ -178,6 +189,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 	}()
 	select {
 	case err = <-serveErr:
+		err = resolveServeError(ctx.Err(), err)
 	case <-sigCtx.Done():
 		err = ctx.Err()
 		var reason error
@@ -202,9 +214,6 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 		} else if serveExitErr != nil {
 			err = errors.Join(err, serveExitErr)
 		}
-	}
-	if isCleanServerClosed(err) {
-		err = nil
 	}
 	return err
 }

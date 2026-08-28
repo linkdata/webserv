@@ -1,6 +1,9 @@
 package webserv
 
 import (
+	"context"
+	"errors"
+	"net/http"
 	"testing"
 	"time"
 )
@@ -53,6 +56,38 @@ func TestShutdownTimeLimit_ConfigValueOverridesDefault(t *testing.T) {
 	cfg := &Config{ShutdownTimeLimit: 25 * time.Millisecond}
 	if got := cfg.shutdownTimeLimit(); got != cfg.ShutdownTimeLimit {
 		t.Fatalf("shutdownTimeLimit() = %v, want %v", got, cfg.ShutdownTimeLimit)
+	}
+}
+
+func TestResolveServeError(t *testing.T) {
+	serveFailure := errors.New("serve failure")
+	for _, tc := range []struct {
+		name       string
+		ctxErr     error
+		serveErr   error
+		want       error
+		wantJoined bool
+	}{
+		{name: "clean close", serveErr: http.ErrServerClosed},
+		{name: "canceled clean close", ctxErr: context.Canceled, serveErr: http.ErrServerClosed, want: context.Canceled},
+		{name: "serve failure", serveErr: serveFailure, want: serveFailure},
+		{name: "canceled serve failure", ctxErr: context.Canceled, serveErr: serveFailure, want: context.Canceled, wantJoined: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolveServeError(tc.ctxErr, tc.serveErr)
+			if tc.wantJoined {
+				if !errors.Is(got, tc.want) || !errors.Is(got, serveFailure) {
+					t.Fatalf("resolveServeError() = %v, want match %v and %v", got, tc.want, serveFailure)
+				}
+			} else if tc.ctxErr != nil && !errors.Is(got, tc.want) {
+				t.Fatalf("resolveServeError() = %v, want match %v", got, tc.want)
+			} else if tc.ctxErr == nil && got != tc.want {
+				t.Fatalf("resolveServeError() = %v, want %v", got, tc.want)
+			}
+			if errors.Is(got, http.ErrServerClosed) {
+				t.Fatalf("resolveServeError() = %v, unexpectedly matches %v", got, http.ErrServerClosed)
+			}
+		})
 	}
 }
 
