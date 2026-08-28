@@ -55,6 +55,8 @@ func isCleanServerClosed(err error) bool {
 
 func serveServer(srv *http.Server, l net.Listener) (err error) {
 	if tlsListener, ok := l.(*serverTLSListener); ok {
+		// Keep the embedded TLS listener's config isolated from ServeTLS, whose
+		// HTTP/2 setup may mutate srv.TLSConfig.
 		srv.TLSConfig = tlsListener.tlsConfig.Clone()
 		// ServeTLS can fail before Server.Serve takes ownership of the raw listener.
 		defer func() { _ = tlsListener.Close() }()

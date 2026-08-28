@@ -232,6 +232,8 @@ func TestConfigServe_TLSProtocolsFollowGODEBUGAtServe(t *testing.T) {
 		{name: "disable HTTP/2", listenGODEBUG: "http2server=1", serveGODEBUG: "http2server=0", wantProtoMajor: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			// Listener does not read GODEBUG; the contrary value verifies that
+			// the setting at serve time wins.
 			t.Setenv("GODEBUG", tc.listenGODEBUG)
 
 			withCertFiles(t, func(destdir string) {
