@@ -1,9 +1,11 @@
 package webserv_test
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -217,4 +219,72 @@ func TestListener_TLSAdvertisesHTTP2(t *testing.T) {
 			t.Fatalf("negotiated protocol = %q, want %q", state.NegotiatedProtocol, "h2")
 		}
 	})
+}
+
+func TestConfigServe_TLSProtocolsFollowGODEBUGAtServe(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		listenGODEBUG  string
+		serveGODEBUG   string
+		wantProtoMajor int
+	}{
+		{name: "enable HTTP/2", listenGODEBUG: "http2server=0", serveGODEBUG: "http2server=1", wantProtoMajor: 2},
+		{name: "disable HTTP/2", listenGODEBUG: "http2server=1", serveGODEBUG: "http2server=0", wantProtoMajor: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("GODEBUG", tc.listenGODEBUG)
+
+			withCertFiles(t, func(destdir string) {
+				cfg := &webserv.Config{
+					Address: "127.0.0.1:0",
+					CertDir: destdir,
+				}
+				l, err := cfg.Listen()
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				t.Setenv("GODEBUG", tc.serveGODEBUG)
+				ctx, cancel := context.WithCancel(t.Context())
+				serveDone := make(chan error, 1)
+				go func() {
+					serveDone <- cfg.Serve(ctx, l, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusNoContent)
+					}))
+				}()
+				defer func() {
+					cancel()
+					if err := <-serveDone; !errors.Is(err, context.Canceled) {
+						t.Errorf("Serve() error = %v, want %v", err, context.Canceled)
+					}
+				}()
+
+				transport := &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: true,
+					},
+					ForceAttemptHTTP2: true,
+				}
+				defer transport.CloseIdleConnections()
+
+				client := &http.Client{
+					Transport: transport,
+					Timeout:   3 * time.Second,
+				}
+				resp, err := client.Get("https://" + l.Addr().String())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = resp.Body.Close(); err != nil {
+					t.Fatal(err)
+				}
+				if resp.StatusCode != http.StatusNoContent {
+					t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusNoContent)
+				}
+				if resp.ProtoMajor != tc.wantProtoMajor {
+					t.Fatalf("protocol = %q, want major version %d", resp.Proto, tc.wantProtoMajor)
+				}
+			})
+		})
+	}
 }

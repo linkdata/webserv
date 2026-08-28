@@ -28,7 +28,7 @@ Wiring up `http.Server` and `net.Listener` by hand is easy to get subtly wrong. 
 * **Sane timeouts by default.** `Serve` sets `ReadHeaderTimeout` and `IdleTimeout`. A bare `http.Server{}` has no timeouts at all, leaving it open to Slowloris-style connection exhaustion.
 * **TLS 1.3 minimum.** When a certificate is loaded, the listener pins `MinVersion` to TLS 1.3 instead of relying on the standard library default.
 * **Quiet TLS handshake errors.** Failed handshakes (port scanners, plain HTTP sent to an HTTPS port) no longer flood your logs by default; set `LogTLSErrors` to keep them.
-* **Recovers serve panics.** A panic inside `srv.Serve` is recovered and returned as an error matching `ErrServePanic` instead of taking down the process.
+* **Recovers serve panics.** A panic while serving is recovered and returned as an error matching `ErrServePanic` instead of taking down the process.
 
 ### Convenience
 
