@@ -2,9 +2,9 @@ package webserv
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -54,11 +54,15 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 		}
 		if l != nil {
 			if listenUrl = overrideUrl; listenUrl == "" {
-				listenUrl = fmt.Sprintf("http%s://%s", schemesuffix, listenUrlString(l, cert))
+				listenUrl = formatListenURL("http"+schemesuffix, listenUrlString(l, cert))
 			}
 		}
 	}
 	return
+}
+
+func formatListenURL(scheme, hostPort string) string {
+	return (&url.URL{Scheme: scheme, Host: hostPort}).String()
 }
 
 func normalizeListenAddr(address, defaultpriv, defaultother string) (string, error) {

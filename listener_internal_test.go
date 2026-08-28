@@ -17,6 +17,13 @@ func certWithDNSNames(names ...string) *tls.Certificate {
 	return &tls.Certificate{Leaf: &x509.Certificate{DNSNames: names}}
 }
 
+func TestFormatListenURL_EscapesIPv6Zone(t *testing.T) {
+	addr := (&net.TCPAddr{IP: net.ParseIP("fe80::1"), Port: 8080, Zone: "eth0"}).String()
+	if got, want := formatListenURL("http", addr), "http://[fe80::1%25eth0]:8080"; got != want {
+		t.Fatalf("formatListenURL() = %q, want %q", got, want)
+	}
+}
+
 func TestNormalizeListenAddr_HostWithoutPortGetsDefaultPort(t *testing.T) {
 	httpDefault := "80"
 	httpsDefault := "443"
