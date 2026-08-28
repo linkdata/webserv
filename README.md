@@ -1,5 +1,5 @@
 [![build](https://github.com/linkdata/webserv/actions/workflows/go.yml/badge.svg)](https://github.com/linkdata/webserv/actions/workflows/go.yml)
-[![coverage](https://github.com/linkdata/webserv/blob/coverage/main/badge.svg)](https://html-preview.github.io/?url=https://github.com/linkdata/webserv/blob/coverage/main/report.html)
+[![coverage](https://github.com/linkdata/webserv/blob/gitcoverage/main/badge.svg)](https://html-preview.github.io/?url=https://github.com/linkdata/webserv/blob/gitcoverage/main/report.html)
 [![Docs](https://godoc.org/github.com/linkdata/webserv?status.svg)](https://godoc.org/github.com/linkdata/webserv)
 
 # webserv
