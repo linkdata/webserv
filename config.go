@@ -53,6 +53,18 @@ func isCleanServerClosed(err error) bool {
 	return err == http.ErrServerClosed
 }
 
+func serveServer(srv *http.Server, l net.Listener) (err error) {
+	if tlsListener, ok := l.(*serverTLSListener); ok {
+		srv.TLSConfig = tlsListener.tlsConfig.Clone()
+		// ServeTLS can fail before Server.Serve takes ownership of the raw listener.
+		defer func() { _ = tlsListener.Close() }()
+		err = srv.ServeTLS(tlsListener.raw, "", "")
+		return
+	}
+	err = srv.Serve(l)
+	return
+}
+
 // Listen performs initial setup for a simple web server and returns a
 // [net.Listener] if successful.
 //
@@ -107,27 +119,35 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
 	return
 }
 
-// ServeWith catches SIGINT and SIGTERM and calls srv.Serve(l). A controlled
-// shutdown is triggered by either of those signals or by ctx being canceled,
-// using [net/http.Server.Shutdown] bounded by [Config.ShutdownTimeLimit] (or 1
-// second when [Config.ShutdownTimeLimit] is zero).
+// ServeWith serves requests with srv on l and handles controlled shutdown.
+//
+// For a TLS listener passed directly from [Listener], it calls
+// [net/http.Server.ServeTLS] so net/http applies srv's HTTP protocol policy
+// during TLS negotiation. The listener's TLS configuration replaces
+// srv.TLSConfig and is not restored. Other listeners are passed to
+// [net/http.Server.Serve].
+//
+// ServeWith catches SIGINT and SIGTERM. A controlled shutdown is triggered by
+// either signal or by ctx being canceled, using [net/http.Server.Shutdown]
+// bounded by [Config.ShutdownTimeLimit] (or 1 second when
+// [Config.ShutdownTimeLimit] is zero).
 //
 // The returned error depends on what ended serving:
 //   - a clean shutdown returns nil ([net/http.ErrServerClosed] is mapped to nil);
-//   - if ctx was canceled, it returns an error matching ctx.Err(); if srv.Serve
-//     also exits with a non-clean error, the errors are joined with
+//   - if ctx was canceled, it returns an error matching ctx.Err(); if serving
+//     also ends with a non-clean error, the errors are joined with
 //     [errors.Join]; a shutdown that then exceeds [Config.ShutdownTimeLimit]
 //     does not replace that ctx.Err();
 //   - if a signal triggered the shutdown, it returns the shutdown error (such as
 //     [context.DeadlineExceeded] when draining exceeds [Config.ShutdownTimeLimit]),
-//     otherwise the error from srv.Serve.
+//     otherwise the error from serving.
 //
 // Unless [Config.LogTLSErrors] is set, srv.ErrorLog is replaced for the lifetime
 // of the call with a filter that drops TLS handshake error lines and forwards
 // the rest; the original logger is not restored.
 //
-// Panics if ctx, srv or l is nil. Panics from srv.Serve are recovered and
-// returned as an error matching [ErrServePanic].
+// Panics if ctx, srv or l is nil. Panics while serving are recovered and returned
+// as an error matching [ErrServePanic].
 func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listener) (err error) {
 	if ctx == nil {
 		panic("webserv: nil context.Context")
@@ -153,7 +173,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 				serveErr <- newErrServePanic(p)
 			}
 		}()
-		serveErr <- srv.Serve(l)
+		serveErr <- serveServer(srv, l)
 	}()
 	select {
 	case err = <-serveErr:
@@ -188,7 +208,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 	return err
 }
 
-// Serve creates an [net/http.Server] with reasonable defaults and calls
+// Serve creates a [net/http.Server] with reasonable defaults and calls
 // [Config.ServeWith].
 //
 // The server uses handler as its Handler; if handler is nil,

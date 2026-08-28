@@ -16,6 +16,12 @@ const (
 	PrivkeyPem = "privkey.pem"
 )
 
+type serverTLSListener struct {
+	net.Listener
+	raw       net.Listener
+	tlsConfig *tls.Config
+}
+
 // Listener creates a [net.Listener] given an optional preferred address
 // and an optional directory containing certificate files.
 //
@@ -38,14 +44,19 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 		if cert != nil {
 			schemesuffix = "s"
 			if bindAddr, err = normalizeListenAddr(listenAddr, "443", "8443"); err == nil {
-				l, err = tls.Listen(
-					"tcp", bindAddr,
-					&tls.Config{
+				var raw net.Listener
+				if raw, err = net.Listen("tcp", bindAddr); err == nil {
+					tlsConfig := &tls.Config{
 						Certificates: []tls.Certificate{*cert},
 						MinVersion:   tls.VersionTLS13,
 						NextProtos:   []string{"h2", "http/1.1"},
-					},
-				)
+					}
+					l = &serverTLSListener{
+						Listener:  tls.NewListener(raw, tlsConfig),
+						raw:       raw,
+						tlsConfig: tlsConfig,
+					}
+				}
 			}
 		} else {
 			if bindAddr, err = normalizeListenAddr(listenAddr, "80", "8080"); err == nil {
