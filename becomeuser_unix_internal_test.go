@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os/user"
 	"reflect"
+	"syscall"
 	"testing"
 )
 
@@ -13,6 +14,7 @@ type becomeUserFns struct {
 	lookupUserFn func(username string) (*user.User, error)
 	groupIDsFn   func(u *user.User) ([]string, error)
 	geteuidFn    func() int
+	getegidFn    func() int
 	setgroupsFn  func(gids []int) error
 	setgidFn     func(gid int) error
 	setuidFn     func(uid int) error
@@ -25,6 +27,7 @@ func captureBecomeUserFns() becomeUserFns {
 		lookupUserFn: lookupUserFn,
 		groupIDsFn:   groupIDsFn,
 		geteuidFn:    geteuidFn,
+		getegidFn:    getegidFn,
 		setgroupsFn:  setgroupsFn,
 		setgidFn:     setgidFn,
 		setuidFn:     setuidFn,
@@ -37,6 +40,7 @@ func restoreBecomeUserFns(fns becomeUserFns) {
 	lookupUserFn = fns.lookupUserFn
 	groupIDsFn = fns.groupIDsFn
 	geteuidFn = fns.geteuidFn
+	getegidFn = fns.getegidFn
 	setgroupsFn = fns.setgroupsFn
 	setgidFn = fns.setgidFn
 	setuidFn = fns.setuidFn
@@ -130,23 +134,73 @@ func TestBecomeUser_NonRootSkipsSupplementaryGroups(t *testing.T) {
 		return []string{"1000"}, nil
 	}
 	geteuidFn = func() int { return 1000 }
+	getegidFn = func() int { return 1000 }
 	setgroupsFn = func(_ []int) error {
 		setgroupsCalled = true
 		return nil
 	}
-	setgidFn = func(_ int) error { return nil }
-	setuidFn = func(_ int) error { return nil }
+	gotGid, gotUid := -1, -1
+	setgidFn = func(gid int) error {
+		gotGid = gid
+		return nil
+	}
+	setuidFn = func(uid int) error {
+		gotUid = uid
+		return nil
+	}
 	unsetenvFn = func(_ string) error { return nil }
 	setenvFn = func(_, _ string) error { return nil }
 
 	if err := BecomeUser("svc"); err != nil {
 		t.Fatal(err)
 	}
+	if gotGid != 1000 || gotUid != 1000 {
+		t.Fatalf("setgid(%d) setuid(%d), want 1000 for both", gotGid, gotUid)
+	}
 	if groupIDsCalled {
 		t.Fatal("groupIDsFn called for non-root user")
 	}
 	if setgroupsCalled {
 		t.Fatal("setgroupsFn called for non-root user")
+	}
+}
+
+func TestBecomeUser_NonRootRefusesIdentityChange(t *testing.T) {
+	tests := []struct {
+		name       string
+		euid, egid int
+		uid, gid   string
+	}{
+		{"uid differs", 1001, 1000, "1000", "1000"},
+		{"gid differs", 1000, 1001, "1000", "1000"},
+		{"target is root", 1000, 1000, "0", "0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			saved := captureBecomeUserFns()
+			defer restoreBecomeUserFns(saved)
+
+			u := &user.User{Username: "svc", Uid: tt.uid, Gid: tt.gid, HomeDir: "/tmp/svc"}
+			called := false
+
+			lookupUserFn = func(_ string) (*user.User, error) { return u, nil }
+			groupIDsFn = func(_ *user.User) ([]string, error) { called = true; return nil, nil }
+			geteuidFn = func() int { return tt.euid }
+			getegidFn = func() int { return tt.egid }
+			setgroupsFn = func(_ []int) error { called = true; return nil }
+			setgidFn = func(_ int) error { called = true; return nil }
+			setuidFn = func(_ int) error { called = true; return nil }
+			unsetenvFn = func(_ string) error { called = true; return nil }
+			setenvFn = func(_, _ string) error { called = true; return nil }
+
+			err := BecomeUser("svc")
+			if !errors.Is(err, ErrBecomeUser) || !errors.Is(err, syscall.EPERM) {
+				t.Fatalf("err=%v, want ErrBecomeUser wrapping EPERM", err)
+			}
+			if called {
+				t.Fatal("identity or environment changed after refusal")
+			}
+		})
 	}
 }
 
