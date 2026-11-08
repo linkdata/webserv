@@ -81,12 +81,7 @@ func formatListenURL(scheme, hostPort string) string {
 
 func normalizeListenAddr(address, defaultpriv, defaultother string) (string, error) {
 	// A complete "host:port" (including "[host]:port" and ":port") is kept as-is.
-	// The empty bracketed host "[]" is the one exception: unlike a port-only
-	// ":port" it is never a valid host.
 	if _, _, err := net.SplitHostPort(address); err == nil {
-		if strings.HasPrefix(address, "[]") {
-			return "", net.InvalidAddrError(address)
-		}
 		return address, nil
 	}
 
