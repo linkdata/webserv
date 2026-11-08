@@ -137,7 +137,7 @@ func listenUrlString(l net.Listener, cert *tls.Certificate, bindAddr string) (ad
 		_, bindIPErr := netip.ParseAddr(bindHost)
 		// Keep the existing URL choice for hostnames and 127.0.0.1.
 		if ip := net.ParseIP(host); ip != nil &&
-			(ip.IsUnspecified() || (ip.IsLoopback() && (bindIPErr != nil || bindHost == "127.0.0.1"))) {
+			(ip.IsUnspecified() || (ip.IsLoopback() && (bindIPErr != nil || host == "127.0.0.1"))) {
 			addr = net.JoinHostPort(localhostOrDNSName(cert), port)
 		}
 	}

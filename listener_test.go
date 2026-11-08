@@ -96,6 +96,30 @@ func TestListener_SpecificLoopbackURLUsesBoundIP(t *testing.T) {
 	}
 }
 
+func TestListener_MappedCanonicalLoopbackKeepsTLSName(t *testing.T) {
+	const bindAddr = "[::ffff:127.0.0.1]:0"
+	probe, err := net.Listen("tcp", bindAddr)
+	if err != nil {
+		t.Skipf("cannot bind %s: %v", bindAddr, err)
+	}
+	_ = probe.Close()
+
+	withCertFiles(t, func(certDir string) {
+		l, gotURL, _, err := webserv.Listener(bindAddr, certDir, "", "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = l.Close() }()
+		_, port, err := net.SplitHostPort(l.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := "https://localhost:" + port; gotURL != want {
+			t.Fatalf("Listener URL = %q, want %q", gotURL, want)
+		}
+	})
+}
+
 func TestNew(t *testing.T) {
 	withCertFiles(t, func(destdir string) {
 		type args struct {
