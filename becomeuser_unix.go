@@ -3,6 +3,8 @@
 package webserv
 
 import (
+	"fmt"
+	"math"
 	"os"
 	"os/user"
 	"strconv"
@@ -26,7 +28,14 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) {
 	for i := 0; i < len(groupIDs) && err == nil; i++ {
 		var gid int
 		if gid, err = strconv.Atoi(groupIDs[i]); err == nil {
-			gids = append(gids, gid)
+			// On 32-bit cgo, os/user formats high uint32 GIDs as negative ints.
+			if gid == -1 || (strconv.IntSize == 64 && (gid < 0 || uint64(gid) >= math.MaxUint32)) {
+				err = fmt.Errorf("supplementary GID %d is outside the valid range 0..%d", gid, uint64(math.MaxUint32-1))
+			} else {
+				gids = append(gids, gid)
+			}
+		} else {
+			err = fmt.Errorf("supplementary GID %q: %w", groupIDs[i], err)
 		}
 	}
 	return
@@ -34,9 +43,10 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) {
 
 // BecomeUser switches to the given userName if not empty.
 //
-// When running as root (euid 0) it resets the supplementary groups to those of
-// the target user and then sets the GID and UID, in that order (setgroups,
-// setgid, setuid). When not root the supplementary-groups reset is skipped and
+// When running as root (euid 0), it refuses targets resolving to UID 0 or
+// invalid IDs before changing credentials. It then resets supplementary groups
+// to those of the target user and sets the GID and UID, in that order
+// (setgroups, setgid, setuid). When not root the groups reset is skipped and
 // it fails with [syscall.EPERM] unless the target UID and GID already match
 // the effective ids of the process.
 //
@@ -54,14 +64,23 @@ func BecomeUser(userName string) error {
 				if gid, err = strconv.Atoi(u.Gid); err == nil {
 					euid := geteuidFn()
 					if euid == 0 {
-						var groupIDs []string
-						if groupIDs, err = groupIDsFn(u); err == nil {
-							var gids []int
-							if gids, err = parseGroupIDs(groupIDs); err == nil {
-								if len(gids) == 0 {
-									gids = []int{gid}
+						switch {
+						case uid == 0:
+							err = fmt.Errorf("resolved UID %d would leave the process running as root", uid)
+						case uid < 0 || uint64(uid) >= math.MaxUint32:
+							err = fmt.Errorf("resolved UID %d is outside the valid range 1..%d", uid, uint64(math.MaxUint32-1))
+						case gid < 0 || uint64(gid) >= math.MaxUint32:
+							err = fmt.Errorf("resolved GID %d is outside the valid range 0..%d", gid, uint64(math.MaxUint32-1))
+						default:
+							var groupIDs []string
+							if groupIDs, err = groupIDsFn(u); err == nil {
+								var gids []int
+								if gids, err = parseGroupIDs(groupIDs); err == nil {
+									if len(gids) == 0 {
+										gids = []int{gid}
+									}
+									err = setgroupsFn(gids)
 								}
-								err = setgroupsFn(gids)
 							}
 						}
 					} else if uid != euid || gid != getegidFn() {
@@ -81,7 +100,11 @@ func BecomeUser(userName string) error {
 							}
 						}
 					}
+				} else {
+					err = fmt.Errorf("resolved GID %q: %w", u.Gid, err)
 				}
+			} else {
+				err = fmt.Errorf("resolved UID %q: %w", u.Uid, err)
 			}
 		}
 	}

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os/user"
 	"reflect"
+	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 )
@@ -52,7 +54,7 @@ func TestBecomeUser_RootSetsSupplementaryGroupsBeforeDroppingPrivileges(t *testi
 	saved := captureBecomeUserFns()
 	defer restoreBecomeUserFns(saved)
 
-	u := &user.User{Username: "svc", Uid: "101", Gid: "201", HomeDir: "/tmp/svc"}
+	u := &user.User{Username: "svc", Uid: "101", Gid: "0", HomeDir: "/tmp/svc"}
 	sequence := make([]string, 0, 8)
 	gotGroups := []int(nil)
 
@@ -65,7 +67,7 @@ func TestBecomeUser_RootSetsSupplementaryGroupsBeforeDroppingPrivileges(t *testi
 	}
 	groupIDsFn = func(_ *user.User) ([]string, error) {
 		sequence = append(sequence, "groupids")
-		return []string{"201", "202"}, nil
+		return []string{"0", "202"}, nil
 	}
 	geteuidFn = func() int { return 0 }
 	setgroupsFn = func(gids []int) error {
@@ -75,7 +77,7 @@ func TestBecomeUser_RootSetsSupplementaryGroupsBeforeDroppingPrivileges(t *testi
 	}
 	setgidFn = func(gid int) error {
 		sequence = append(sequence, "setgid")
-		if gid != 201 {
+		if gid != 0 {
 			t.Fatalf("gid=%d", gid)
 		}
 		return nil
@@ -100,7 +102,7 @@ func TestBecomeUser_RootSetsSupplementaryGroupsBeforeDroppingPrivileges(t *testi
 		t.Fatal(err)
 	}
 
-	wantGroups := []int{201, 202}
+	wantGroups := []int{0, 202}
 	if !reflect.DeepEqual(gotGroups, wantGroups) {
 		t.Fatalf("groups=%v want %v", gotGroups, wantGroups)
 	}
@@ -204,6 +206,63 @@ func TestBecomeUser_NonRootRefusesIdentityChange(t *testing.T) {
 	}
 }
 
+func TestBecomeUser_RootRefusesUnsafeIDs(t *testing.T) {
+	tests := []struct {
+		name, uid, gid string
+		groups         []string
+		want, field    string
+	}{
+		{"root", "0", "0", nil, "UID 0", "resolved UID"},
+		{"root alias", "00", "33", nil, "UID 0", "resolved UID"},
+		{"UID sentinel", "4294967295", "33", nil, "4294967295", "resolved UID"},
+		{"UID overflow", "4294967296", "33", nil, "4294967296", "resolved UID"},
+		{"negative UID", "-1", "33", nil, "UID -1", "resolved UID"},
+		{"malformed UID", "oops", "33", nil, "oops", "resolved UID"},
+		{"GID sentinel", "33", "4294967295", nil, "4294967295", "resolved GID"},
+		{"GID overflow", "33", "4294967296", nil, "4294967296", "resolved GID"},
+		{"negative GID", "33", "-1", nil, "GID -1", "resolved GID"},
+		{"malformed GID", "33", "oops", nil, "oops", "resolved GID"},
+		{"supplementary GID sentinel", "33", "33", []string{"4294967295"}, "4294967295", "supplementary GID"},
+		{"supplementary GID overflow", "33", "33", []string{"50", "4294967296"}, "4294967296", "supplementary GID"},
+		{"negative supplementary GID", "33", "33", []string{"-1"}, "GID -1", "supplementary GID"},
+		{"malformed supplementary GID", "33", "33", []string{"oops"}, "oops", "supplementary GID"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			saved := captureBecomeUserFns()
+			defer restoreBecomeUserFns(saved)
+
+			lookupUserFn = func(_ string) (*user.User, error) {
+				return &user.User{Username: "www-data", Uid: tt.uid, Gid: tt.gid}, nil
+			}
+			geteuidFn = func() int { return 0 }
+			groupIDsCalled, changed := false, false
+			groupIDsFn = func(_ *user.User) ([]string, error) {
+				groupIDsCalled = true
+				return tt.groups, nil
+			}
+			setgroupsFn = func(_ []int) error { changed = true; return nil }
+			setgidFn = func(_ int) error { changed = true; return nil }
+			setuidFn = func(_ int) error { changed = true; return nil }
+			unsetenvFn = func(_ string) error { changed = true; return nil }
+			setenvFn = func(_, _ string) error { changed = true; return nil }
+
+			err := BecomeUser("www-data")
+			if !errors.Is(err, ErrBecomeUser) || !strings.Contains(err.Error(), tt.want) || !strings.Contains(err.Error(), tt.field) {
+				t.Fatalf("error = %v, want ErrBecomeUser containing %q and %q", err, tt.want, tt.field)
+			}
+			if tt.uid == "0" || tt.uid == "00" {
+				if !strings.Contains(err.Error(), "root") {
+					t.Fatalf("error = %v, want reason for refusing root", err)
+				}
+			}
+			if changed || groupIDsCalled != (tt.groups != nil) {
+				t.Fatal("unexpected group lookup or credential/environment change after refusal")
+			}
+		})
+	}
+}
+
 func TestBecomeUser_GroupIDParseErrorStopsBeforeSetgid(t *testing.T) {
 	saved := captureBecomeUserFns()
 	defer restoreBecomeUserFns(saved)
@@ -270,6 +329,16 @@ func TestParseGroupIDs_ErrorBeforeValidEntryIsNotSilentlyDropped(t *testing.T) {
 	}
 }
 
+func TestParseGroupIDs_Signed32BitHighGID(t *testing.T) {
+	if strconv.IntSize != 32 {
+		t.Skip("32-bit cgo group ID representation")
+	}
+	gids, err := parseGroupIDs([]string{"-2147483648"})
+	if err != nil || !reflect.DeepEqual(gids, []int{-2147483648}) {
+		t.Fatalf("gids=%v, err=%v", gids, err)
+	}
+}
+
 func TestBecomeUser_RootWithoutSupplementaryGroupsFallsBackToPrimaryGroup(t *testing.T) {
 	saved := captureBecomeUserFns()
 	defer restoreBecomeUserFns(saved)
@@ -284,7 +353,12 @@ func TestBecomeUser_RootWithoutSupplementaryGroupsFallsBackToPrimaryGroup(t *tes
 		gotGroups = append([]int{}, gids...)
 		return nil
 	}
-	setgidFn = func(_ int) error { return nil }
+	setgidFn = func(gid int) error {
+		if gid != 201 {
+			t.Fatalf("gid=%d", gid)
+		}
+		return nil
+	}
 	setuidFn = func(_ int) error { return nil }
 	unsetenvFn = func(_ string) error { return nil }
 	setenvFn = func(_, _ string) error { return nil }

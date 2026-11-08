@@ -89,7 +89,7 @@ func serveServer(srv *http.Server, l net.Listener) (err error) {
 //
 // If cfg.User is set it then switches to that user with [BecomeUser], dropping
 // supplementary groups, GID and UID (when running as root). Note that this is
-// not supported on Windows.
+// not supported on Windows. A root process refuses a User resolving to UID 0.
 //
 // If cfg.DataDir or cfg.DefaultDataDirSuffix is set, calculates the absolute
 // data directory path with [DefaultDataDir] and sets cfg.DataDir. If

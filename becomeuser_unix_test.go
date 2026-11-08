@@ -11,10 +11,13 @@ import (
 	"github.com/linkdata/webserv"
 )
 
-// TestBecomeUser_CurrentUserSucceeds verifies that switching to the user the
-// process already runs as is a no-op that succeeds. Privilege switching is only
+// TestBecomeUser_CurrentUserSucceeds verifies that selecting the current
+// non-root user is a no-op that succeeds. Privilege switching is only
 // supported on unix; see becomeuser_test.go for the cross-platform cases.
 func TestBecomeUser_CurrentUserSucceeds(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("BecomeUser refuses targets that keep UID 0")
+	}
 	if userName := os.Getenv("USER"); userName != "" {
 		u, err := user.Lookup(userName)
 		if err != nil {
