@@ -34,6 +34,8 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) {
 			} else {
 				gids = append(gids, gid)
 			}
+		} else {
+			err = fmt.Errorf("supplementary GID %q: %w", groupIDs[i], err)
 		}
 	}
 	return
@@ -98,7 +100,11 @@ func BecomeUser(userName string) error {
 							}
 						}
 					}
+				} else {
+					err = fmt.Errorf("resolved GID %q: %w", u.Gid, err)
 				}
+			} else {
+				err = fmt.Errorf("resolved UID %q: %w", u.Uid, err)
 			}
 		}
 	}

@@ -210,19 +210,22 @@ func TestBecomeUser_RootRefusesUnsafeIDs(t *testing.T) {
 	tests := []struct {
 		name, uid, gid string
 		groups         []string
-		want           string
+		want, field    string
 	}{
-		{"root", "0", "0", nil, "UID 0"},
-		{"root alias", "00", "33", nil, "UID 0"},
-		{"UID sentinel", "4294967295", "33", nil, "4294967295"},
-		{"UID overflow", "4294967296", "33", nil, "4294967296"},
-		{"negative UID", "-1", "33", nil, "UID -1"},
-		{"GID sentinel", "33", "4294967295", nil, "4294967295"},
-		{"GID overflow", "33", "4294967296", nil, "4294967296"},
-		{"negative GID", "33", "-1", nil, "GID -1"},
-		{"supplementary GID sentinel", "33", "33", []string{"4294967295"}, "4294967295"},
-		{"supplementary GID overflow", "33", "33", []string{"50", "4294967296"}, "4294967296"},
-		{"negative supplementary GID", "33", "33", []string{"-1"}, "GID -1"},
+		{"root", "0", "0", nil, "UID 0", "resolved UID"},
+		{"root alias", "00", "33", nil, "UID 0", "resolved UID"},
+		{"UID sentinel", "4294967295", "33", nil, "4294967295", "resolved UID"},
+		{"UID overflow", "4294967296", "33", nil, "4294967296", "resolved UID"},
+		{"negative UID", "-1", "33", nil, "UID -1", "resolved UID"},
+		{"malformed UID", "oops", "33", nil, "oops", "resolved UID"},
+		{"GID sentinel", "33", "4294967295", nil, "4294967295", "resolved GID"},
+		{"GID overflow", "33", "4294967296", nil, "4294967296", "resolved GID"},
+		{"negative GID", "33", "-1", nil, "GID -1", "resolved GID"},
+		{"malformed GID", "33", "oops", nil, "oops", "resolved GID"},
+		{"supplementary GID sentinel", "33", "33", []string{"4294967295"}, "4294967295", "supplementary GID"},
+		{"supplementary GID overflow", "33", "33", []string{"50", "4294967296"}, "4294967296", "supplementary GID"},
+		{"negative supplementary GID", "33", "33", []string{"-1"}, "GID -1", "supplementary GID"},
+		{"malformed supplementary GID", "33", "33", []string{"oops"}, "oops", "supplementary GID"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -245,8 +248,8 @@ func TestBecomeUser_RootRefusesUnsafeIDs(t *testing.T) {
 			setenvFn = func(_, _ string) error { changed = true; return nil }
 
 			err := BecomeUser("www-data")
-			if !errors.Is(err, ErrBecomeUser) || !strings.Contains(err.Error(), tt.want) {
-				t.Fatalf("error = %v, want ErrBecomeUser containing %q", err, tt.want)
+			if !errors.Is(err, ErrBecomeUser) || !strings.Contains(err.Error(), tt.want) || !strings.Contains(err.Error(), tt.field) {
+				t.Fatalf("error = %v, want ErrBecomeUser containing %q and %q", err, tt.want, tt.field)
 			}
 			if tt.uid == "0" || tt.uid == "00" {
 				if !strings.Contains(err.Error(), "root") {

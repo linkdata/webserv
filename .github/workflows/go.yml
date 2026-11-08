@@ -42,7 +42,7 @@ jobs:
           fi
 
       - name: 32-bit GID regression
-        run: CGO_ENABLED=0 GOARCH=386 go test -run '^TestParseGroupIDs_Signed32BitHighGID$' ./...
+        run: CGO_ENABLED=0 GOARCH=386 go test -run '^(TestParseGroupIDs_Signed32BitHighGID|TestBecomeUser_RootRefusesUnsafeIDs)$' ./...
 
       - name: Staticcheck
         run: |
