@@ -672,12 +672,12 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
                         }
                 } else {
                         <span class="cov7" title="15">if bindAddr, err = normalizeListenAddr(listenAddr, "80", "8080"); err == nil </span>{
-                                <span class="cov7" title="12">l, err = net.Listen("tcp", bindAddr)
+                                <span class="cov7" title="14">l, err = net.Listen("tcp", bindAddr)
 </span>                        }
                 }
                 <span class="cov8" title="25">if l != nil </span>{
-                        <span class="cov8" title="20">if listenUrl = overrideUrl; listenUrl == "" </span>{
-                                <span class="cov8" title="20">listenUrl = formatListenURL("http"+schemesuffix, listenUrlString(l, cert, bindAddr))
+                        <span class="cov8" title="22">if listenUrl = overrideUrl; listenUrl == "" </span>{
+                                <span class="cov8" title="22">listenUrl = formatListenURL("http"+schemesuffix, listenUrlString(l, cert, bindAddr))
 </span>                        }
                 }
         }
@@ -685,19 +685,14 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 }
 
 func formatListenURL(scheme, hostPort string) string {
-        <span class="cov8" title="21">return (&amp;url.URL{Scheme: scheme, Host: hostPort}).String()
+        <span class="cov8" title="23">return (&amp;url.URL{Scheme: scheme, Host: hostPort}).String()
 </span>}
 
 func normalizeListenAddr(address, defaultpriv, defaultother string) (string, error) {
         // A complete "host:port" (including "[host]:port" and ":port") is kept as-is.
-        // The empty bracketed host "[]" is the one exception: unlike a port-only
-        // ":port" it is never a valid host.
-        <span class="cov10" title="41">if _, _, err := net.SplitHostPort(address); err == nil </span>{
-                <span class="cov8" title="26">if strings.HasPrefix(address, "[]") </span>{
-                        <span class="cov4" title="4">return "", net.InvalidAddrError(address)
-</span>                }
-                <span class="cov8" title="22">return address, nil</span>
-        }
+        <span class="cov10" title="39">if _, _, err := net.SplitHostPort(address); err == nil </span>{
+                <span class="cov8" title="24">return address, nil
+</span>        }
 
         // No port: address is a bare host. A leading "[" must wrap a valid IP
         // literal so net.JoinHostPort can re-bracket it below; otherwise reject it
@@ -725,7 +720,7 @@ func defaultListenPort(euid int, defaultpriv, defaultother string) (port string)
 }
 
 func localhostOrDNSName(cert *tls.Certificate) string {
-        <span class="cov9" title="28">if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span>{
+        <span class="cov9" title="30">if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span>{
                 <span class="cov7" title="17">name := cert.Leaf.DNSNames[0]
                 if host, _, err := net.SplitHostPort(name); err == nil </span>{
                         <span class="cov6" title="11">name = host
@@ -736,21 +731,21 @@ func localhostOrDNSName(cert *tls.Certificate) string {
                         <span class="cov7" title="13">return name
 </span>                }
         }
-        <span class="cov7" title="15">return "localhost"</span>
+        <span class="cov7" title="17">return "localhost"</span>
 }
 
 func listenUrlString(l net.Listener, cert *tls.Certificate, bindAddr string) (addr string) {
-        <span class="cov8" title="23">addr = l.Addr().String()
+        <span class="cov8" title="25">addr = l.Addr().String()
         if host, port, err := net.SplitHostPort(addr); err == nil </span>{
-                <span class="cov8" title="23">bindHost, _, _ := net.SplitHostPort(bindAddr)
+                <span class="cov8" title="25">bindHost, _, _ := net.SplitHostPort(bindAddr)
                 _, bindIPErr := netip.ParseAddr(bindHost)
 </span>                // Keep the existing URL choice for hostnames and 127.0.0.1.
-                <span class="cov8" title="23">if ip := net.ParseIP(host); ip != nil &amp;&amp;
+                <span class="cov8" title="25">if ip := net.ParseIP(host); ip != nil &amp;&amp;
                         (ip.IsUnspecified() || (ip.IsLoopback() &amp;&amp; (bindIPErr != nil || host == "127.0.0.1"))) </span>{
-                        <span class="cov8" title="20">addr = net.JoinHostPort(localhostOrDNSName(cert), port)
+                        <span class="cov8" title="22">addr = net.JoinHostPort(localhostOrDNSName(cert), port)
 </span>                }
         }
-        <span class="cov8" title="23">return</span>
+        <span class="cov8" title="25">return</span>
 }
 </pre>
 		
