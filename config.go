@@ -221,12 +221,30 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 	return err
 }
 
+func defaultHTTPServer(handler http.Handler) *http.Server {
+	return &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: time.Second * 5,
+		ReadTimeout:       time.Minute,
+		WriteTimeout:      time.Minute,
+		IdleTimeout:       time.Minute,
+	}
+}
+
 // Serve creates a [net/http.Server] with reasonable defaults and calls
 // [Config.ServeWith].
 //
 // The server uses handler as its Handler; if handler is nil,
-// [net/http.DefaultServeMux] is used by net/http. ReadHeaderTimeout is set to 5
-// seconds and IdleTimeout is set to 1 minute.
+// [net/http.DefaultServeMux] is used by net/http. ReadHeaderTimeout is 5
+// seconds for HTTP/1 headers; ReadTimeout, WriteTimeout and IdleTimeout are
+// 1 minute. ReadTimeout covers HTTP/1 headers and body, and HTTP/2 body reads
+// after complete headers. WriteTimeout bounds response writes, including
+// HTTP/2 streams. HTTP/2 does not apply ReadHeaderTimeout to incomplete
+// headers. For long uploads, handlers may need to extend both read and write
+// deadlines before they expire;
+// streaming responses may need to extend the write deadline. Use
+// [net/http.NewResponseController] or [Config.ServeWith] with a custom
+// [net/http.Server].
 //
 // Serve takes ownership of l for serving and returns the error from
 // [Config.ServeWith]; see that method for the full return contract (nil on a
@@ -235,12 +253,7 @@ func (cfg *Config) ServeWith(ctx context.Context, srv *http.Server, l net.Listen
 //
 // Panics if ctx or l is nil.
 func (cfg *Config) Serve(ctx context.Context, l net.Listener, handler http.Handler) error {
-	srv := &http.Server{
-		Handler:           handler,
-		ReadHeaderTimeout: time.Second * 5,
-		IdleTimeout:       time.Minute,
-	}
-	return cfg.ServeWith(ctx, srv, l)
+	return cfg.ServeWith(ctx, defaultHTTPServer(handler), l)
 }
 
 // ListenAndServe calls [Config.Listen] followed by [Config.Serve].
