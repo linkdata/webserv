@@ -368,6 +368,29 @@ func TestConfigListen_ErrorStillAbsolutizesCertDir(t *testing.T) {
 	}
 }
 
+func TestConfigListen_RetryKeepsUnresolvedCertDir(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.Remove(dir); err != nil {
+		t.Skipf("cannot remove current working directory: %v", err)
+	}
+
+	cfg := &webserv.Config{Address: "127.0.0.1:0", CertDir: "certs"}
+	for attempt := 1; attempt <= 2; attempt++ {
+		l, err := cfg.Listen()
+		if l != nil {
+			_ = l.Close()
+			t.Fatalf("Listen attempt %d returned a listener on error", attempt)
+		}
+		if err == nil {
+			t.Fatalf("Listen attempt %d succeeded with an unresolved CertDir", attempt)
+		}
+		if cfg.CertDir != "certs" {
+			t.Fatalf("Listen attempt %d changed CertDir to %q", attempt, cfg.CertDir)
+		}
+	}
+}
+
 func TestConfigListen_ErrorClearsCallerDataDir(t *testing.T) {
 	// A failure before DataDir is computed (here, missing cert files in an
 	// existing CertDir) still resets a caller-supplied cfg.DataDir to empty.

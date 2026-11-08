@@ -96,16 +96,21 @@ func serveServer(srv *http.Server, l net.Listener) (err error) {
 // cfg.DataDirMode is nonzero, [UseDataDir] creates the directory if necessary,
 // using cfg.DataDirMode subject to the process umask.
 //
-// On return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
+// On success, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
 // If Listen returns an error, cfg.DataDir is reset to empty regardless of the
-// value the caller supplied, while cfg.CertDir keeps any absolute path resolved
-// before the failure.
+// value the caller supplied. cfg.CertDir keeps any absolute path resolved
+// before the failure, or its original value if resolution failed.
 // If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
 // URL like "http://localhost:80" as soon as the socket is opened.
 // Therefore cfg.ListenURL can be non-empty even if Listen returns an error from a
 // later step, such as user switching or data directory setup.
 func (cfg *Config) Listen() (l net.Listener, err error) {
-	if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL); err == nil {
+	var absCertDir string
+	l, cfg.ListenURL, absCertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL)
+	if err == nil || absCertDir != "" {
+		cfg.CertDir = absCertDir
+	}
+	if err == nil {
 		if cfg.CertDir != "" {
 			cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
 		}
