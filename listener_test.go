@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,18 +14,6 @@ import (
 
 	"github.com/linkdata/webserv"
 )
-
-func urlHostAndPort(t *testing.T, scheme string, l net.Listener) string {
-	t.Helper()
-	host, port, err := net.SplitHostPort(l.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
-		host = "localhost"
-	}
-	return scheme + "://" + net.JoinHostPort(host, port)
-}
 
 func withCertFiles(t *testing.T, fn func(destdir string)) {
 	t.Helper()
@@ -70,6 +59,7 @@ func TestRandomPort(t *testing.T) {
 	if gotListener == nil {
 		t.Fatal("no listener")
 	}
+	defer func() { _ = gotListener.Close() }()
 	_, p, err := net.SplitHostPort(gotListener.Addr().String())
 	if err != nil {
 		t.Fatal(err)
@@ -81,6 +71,53 @@ func TestRandomPort(t *testing.T) {
 	if gotUrl != want {
 		t.Errorf("want %q got %q", want, gotUrl)
 	}
+}
+
+func TestListener_SpecificLoopbackURLUsesBoundIP(t *testing.T) {
+	for _, host := range []string{"127.0.0.2", "::1", "::1%lo"} {
+		t.Run(host, func(t *testing.T) {
+			bindAddr := net.JoinHostPort(host, "0")
+			probe, err := net.Listen("tcp", bindAddr)
+			if err != nil {
+				t.Skipf("cannot bind %s: %v", host, err)
+			}
+			_ = probe.Close()
+
+			l, gotURL, _, err := webserv.Listener(bindAddr, "", "", "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = l.Close() }()
+
+			if want := (&url.URL{Scheme: "http", Host: l.Addr().String()}).String(); gotURL != want {
+				t.Fatalf("Listener URL = %q, want %q", gotURL, want)
+			}
+		})
+	}
+}
+
+func TestListener_MappedCanonicalLoopbackKeepsTLSName(t *testing.T) {
+	const bindAddr = "[::ffff:127.0.0.1]:0"
+	probe, err := net.Listen("tcp", bindAddr)
+	if err != nil {
+		t.Skipf("cannot bind %s: %v", bindAddr, err)
+	}
+	_ = probe.Close()
+
+	withCertFiles(t, func(certDir string) {
+		l, gotURL, _, err := webserv.Listener(bindAddr, certDir, "", "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = l.Close() }()
+		_, port, err := net.SplitHostPort(l.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := "https://localhost:" + port; gotURL != want {
+			t.Fatalf("Listener URL = %q, want %q", gotURL, want)
+		}
+	})
 }
 
 func TestNew(t *testing.T) {
@@ -142,8 +179,16 @@ func TestNew(t *testing.T) {
 					return
 				}
 				if gotListener != nil {
-					if want := urlHostAndPort(t, tt.args.scheme, gotListener); gotUrl != want {
-						t.Errorf("ListenURL() = %v, want %v", gotUrl, want)
+					wantHostPort := gotListener.Addr().String()
+					if tt.args.address == "localhost:0" || tt.args.address == "127.0.0.1:0" {
+						_, port, err := net.SplitHostPort(wantHostPort)
+						if err != nil {
+							t.Fatal(err)
+						}
+						wantHostPort = net.JoinHostPort("localhost", port)
+					}
+					if want := tt.args.scheme + "://" + wantHostPort; gotUrl != want {
+						t.Errorf("Listener() URL = %q, want %q", gotUrl, want)
 					}
 					if gotCertDir != tt.args.certDir {
 						t.Error(gotCertDir)

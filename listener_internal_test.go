@@ -155,10 +155,10 @@ func TestListenUrlString_UnspecifiedBindUsesCertDNSName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := listenUrlString(l, certWithDNSNames("example.test")), net.JoinHostPort("example.test", port); got != want {
+	if got, want := listenUrlString(l, certWithDNSNames("example.test"), "0.0.0.0:0"), net.JoinHostPort("example.test", port); got != want {
 		t.Fatalf("listenUrlString() = %q, want %q", got, want)
 	}
-	if got, want := listenUrlString(l, nil), net.JoinHostPort("localhost", port); got != want {
+	if got, want := listenUrlString(l, nil, "0.0.0.0:0"), net.JoinHostPort("localhost", port); got != want {
 		t.Fatalf("listenUrlString() without cert = %q, want %q", got, want)
 	}
 }
@@ -175,7 +175,7 @@ func TestListenUrlString_UnspecifiedBindSkipsWildcardCertDNSName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := listenUrlString(l, certWithDNSNames("*.example.test")), net.JoinHostPort("localhost", port); got != want {
+	if got, want := listenUrlString(l, certWithDNSNames("*.example.test"), "0.0.0.0:0"), net.JoinHostPort("localhost", port); got != want {
 		t.Fatalf("listenUrlString() = %q, want %q", got, want)
 	}
 }

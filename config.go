@@ -100,7 +100,7 @@ func serveServer(srv *http.Server, l net.Listener) (err error) {
 // If Listen returns an error, cfg.DataDir is reset to empty regardless of the
 // value the caller supplied. cfg.CertDir is left unchanged if Listener fails
 // before resolving an absolute path; otherwise it is set to that path or empty.
-// If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
+// If cfg.ListenURL was empty it may be set to a best-guess printable
 // URL like "http://localhost:80" as soon as the socket is opened.
 // Therefore cfg.ListenURL can be non-empty even if Listen returns an error from a
 // later step, such as user switching or data directory setup.

@@ -68,7 +68,7 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 		}
 		if l != nil {
 			if listenUrl = overrideUrl; listenUrl == "" {
-				listenUrl = formatListenURL("http"+schemesuffix, listenUrlString(l, cert))
+				listenUrl = formatListenURL("http"+schemesuffix, listenUrlString(l, cert, bindAddr))
 			}
 		}
 	}
@@ -130,13 +130,15 @@ func localhostOrDNSName(cert *tls.Certificate) string {
 	return "localhost"
 }
 
-func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) {
+func listenUrlString(l net.Listener, cert *tls.Certificate, bindAddr string) (addr string) {
 	addr = l.Addr().String()
 	if host, port, err := net.SplitHostPort(addr); err == nil {
-		if ip := net.ParseIP(host); ip != nil {
-			if ip.IsUnspecified() || ip.IsLoopback() {
-				addr = net.JoinHostPort(localhostOrDNSName(cert), port)
-			}
+		bindHost, _, _ := net.SplitHostPort(bindAddr)
+		_, bindIPErr := netip.ParseAddr(bindHost)
+		// Keep the existing URL choice for hostnames and 127.0.0.1.
+		if ip := net.ParseIP(host); ip != nil &&
+			(ip.IsUnspecified() || (ip.IsLoopback() && (bindIPErr != nil || host == "127.0.0.1"))) {
+			addr = net.JoinHostPort(localhostOrDNSName(cert), port)
 		}
 	}
 	return
