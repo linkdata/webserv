@@ -175,7 +175,6 @@ func TestConfig_ListenAndServe_Signalled(t *testing.T) {
 		cfg := &webserv.Config{
 			Address:     "127.0.0.1:0",
 			CertDir:     destdir,
-			User:        os.Getenv("USER"),
 			DataDir:     homeDir,
 			DataDirMode: 0o750,
 			Logger:      logger,
@@ -211,7 +210,6 @@ func TestConfig_ListenAndServe_Cancelled(t *testing.T) {
 		cfg := &webserv.Config{
 			Address:     "127.0.0.1:0",
 			CertDir:     destdir,
-			User:        os.Getenv("USER"),
 			DataDir:     homeDir,
 			DataDirMode: 0o750,
 			Logger:      logger,

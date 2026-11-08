@@ -65,14 +65,10 @@ func BecomeUser(userName string) error {
 							}
 						}
 					} else if uid != euid || gid != getegidFn() {
-						// Without euid 0, set*id either needs CAP_SETUID/CAP_SETGID,
-						// which a switch between nonzero ids keeps along with the
-						// supplementary groups, or changes only the effective id,
-						// which the leftover real or saved id can undo. Neither
-						// drops privileges. Matching effective ids request no
-						// switch, so real or saved ids that differ from them
-						// (setuid binary, earlier seteuid) and any capabilities
-						// held are out of scope.
+						// Without euid 0, changing IDs can retain supplementary
+						// groups or privileges, or be reversible through real/saved
+						// IDs. Matching effective IDs are allowed, but any existing
+						// saved IDs or privileges remain out of scope.
 						err = syscall.EPERM
 					}
 					if err == nil {
