@@ -57,7 +57,7 @@
 				
 				<option value="file0">github.com/linkdata/webserv/becomeuser_unix.go (100.0%)</option>
 				
-				<option value="file1">github.com/linkdata/webserv/config.go (98.8%)</option>
+				<option value="file1">github.com/linkdata/webserv/config.go (98.9%)</option>
 				
 				<option value="file2">github.com/linkdata/webserv/errbecomeuser.go (100.0%)</option>
 				
@@ -304,16 +304,21 @@ func serveServer(srv *http.Server, l net.Listener) (err error) {
 // cfg.DataDirMode is nonzero, [UseDataDir] creates the directory if necessary,
 // using cfg.DataDirMode subject to the process umask.
 //
-// On return, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
+// On success, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
 // If Listen returns an error, cfg.DataDir is reset to empty regardless of the
-// value the caller supplied, while cfg.CertDir keeps any absolute path resolved
-// before the failure.
+// value the caller supplied. cfg.CertDir is left unchanged if Listener fails
+// before resolving an absolute path; otherwise it is set to that path or empty.
 // If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
 // URL like "http://localhost:80" as soon as the socket is opened.
 // Therefore cfg.ListenURL can be non-empty even if Listen returns an error from a
 // later step, such as user switching or data directory setup.
 func (cfg *Config) Listen() (l net.Listener, err error) {
-        <span class="cov7" title="13">if l, cfg.ListenURL, cfg.CertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL); err == nil </span>{
+        <span class="cov7" title="15">var absCertDir string
+        l, cfg.ListenURL, absCertDir, err = Listener(cfg.Address, cfg.CertDir, cfg.FullchainPem, cfg.PrivkeyPem, cfg.ListenURL)
+        if err == nil || absCertDir != "" </span>{
+                <span class="cov7" title="12">cfg.CertDir = absCertDir
+</span>        }
+        <span class="cov7" title="15">if err == nil </span>{
                 <span class="cov6" title="10">if cfg.CertDir != "" </span>{
                         <span class="cov5" title="6">cfg.logInfo("loaded certificates", "dir", cfg.CertDir)
 </span>                }
@@ -330,14 +335,14 @@ func (cfg *Config) Listen() (l net.Listener, err error) {
                         }
                 }
         }
-        <span class="cov7" title="13">if err != nil </span>{
-                <span class="cov5" title="5">cfg.DataDir = ""
+        <span class="cov7" title="15">if err != nil </span>{
+                <span class="cov5" title="7">cfg.DataDir = ""
                 if l != nil </span>{
                         <span class="cov2" title="2">_ = l.Close()
                         l = nil
 </span>                }
         }
-        <span class="cov7" title="13">return</span>
+        <span class="cov7" title="15">return</span>
 }
 
 // ServeWith serves requests with srv on l and handles controlled shutdown.
@@ -644,7 +649,7 @@ type serverTLSListener struct {
 // successfully, absCertDir contains its absolute path even when certificate
 // loading fails.
 func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) {
-        <span class="cov8" title="23">var cert *tls.Certificate
+        <span class="cov9" title="25">var cert *tls.Certificate
         if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil </span>{
                 <span class="cov8" title="21">var bindAddr string
                 var schemesuffix string
@@ -676,7 +681,7 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 </span>                        }
                 }
         }
-        <span class="cov8" title="23">return</span>
+        <span class="cov9" title="25">return</span>
 }
 
 func formatListenURL(scheme, hostPort string) string {
@@ -775,20 +780,20 @@ import (
 // resolved absolute directory whenever certDir was non-empty after expansion and
 // [path/filepath.Abs] succeeded, regardless of whether the key pair then loaded.
 func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, absCertDir string, err error) {
-        <span class="cov10" title="27">if certDir != "" </span>{
+        <span class="cov10" title="29">if certDir != "" </span>{
                 // Re-check after expansion: a non-empty input may expand to empty
                 // (e.g. "$HOME" with HOME unset), and filepath.Abs("") would resolve
                 // to the current working directory rather than leaving certDir empty.
-                <span class="cov8" title="14">if certDir = os.ExpandEnv(certDir); certDir != "" </span>{
-                        <span class="cov8" title="13">if absCertDir, err = filepath.Abs(certDir); err == nil </span>{
-                                <span class="cov8" title="13">var cer tls.Certificate
+                <span class="cov8" title="16">if certDir = os.ExpandEnv(certDir); certDir != "" </span>{
+                        <span class="cov8" title="15">if absCertDir, err = filepath.Abs(certDir); err == nil </span>{
+                                <span class="cov7" title="13">var cer tls.Certificate
                                 if fullchainPem == "" </span>{
                                         <span class="cov7" title="12">fullchainPem = FullchainPem
 </span>                                }
-                                <span class="cov8" title="13">if privkeyPem == "" </span>{
+                                <span class="cov7" title="13">if privkeyPem == "" </span>{
                                         <span class="cov7" title="12">privkeyPem = PrivkeyPem
 </span>                                }
-                                <span class="cov8" title="13">fc := filepath.Join(absCertDir, fullchainPem)
+                                <span class="cov7" title="13">fc := filepath.Join(absCertDir, fullchainPem)
                                 pk := filepath.Join(absCertDir, privkeyPem)
                                 if cer, err = tls.LoadX509KeyPair(fc, pk); err == nil </span>{
                                         <span class="cov7" title="11">cert = &amp;cer
@@ -796,7 +801,7 @@ func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, 
                         }
                 }
         }
-        <span class="cov10" title="27">return</span>
+        <span class="cov10" title="29">return</span>
 }
 </pre>
 		
