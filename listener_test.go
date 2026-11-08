@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -73,7 +74,7 @@ func TestRandomPort(t *testing.T) {
 }
 
 func TestListener_SpecificLoopbackURLUsesBoundIP(t *testing.T) {
-	for _, host := range []string{"127.0.0.1", "127.0.0.2", "::1"} {
+	for _, host := range []string{"127.0.0.2", "::1", "::1%lo"} {
 		t.Run(host, func(t *testing.T) {
 			bindAddr := net.JoinHostPort(host, "0")
 			probe, err := net.Listen("tcp", bindAddr)
@@ -88,7 +89,7 @@ func TestListener_SpecificLoopbackURLUsesBoundIP(t *testing.T) {
 			}
 			defer func() { _ = l.Close() }()
 
-			if want := "http://" + l.Addr().String(); gotURL != want {
+			if want := (&url.URL{Scheme: "http", Host: l.Addr().String()}).String(); gotURL != want {
 				t.Fatalf("Listener URL = %q, want %q", gotURL, want)
 			}
 		})
@@ -155,7 +156,7 @@ func TestNew(t *testing.T) {
 				}
 				if gotListener != nil {
 					wantHostPort := gotListener.Addr().String()
-					if tt.args.address == "localhost:0" {
+					if tt.args.address == "localhost:0" || tt.args.address == "127.0.0.1:0" {
 						_, port, err := net.SplitHostPort(wantHostPort)
 						if err != nil {
 							t.Fatal(err)

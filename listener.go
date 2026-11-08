@@ -134,8 +134,10 @@ func listenUrlString(l net.Listener, cert *tls.Certificate, bindAddr string) (ad
 	addr = l.Addr().String()
 	if host, port, err := net.SplitHostPort(addr); err == nil {
 		bindHost, _, _ := net.SplitHostPort(bindAddr)
+		_, bindIPErr := netip.ParseAddr(bindHost)
+		// Keep the existing URL choice for hostnames and 127.0.0.1.
 		if ip := net.ParseIP(host); ip != nil &&
-			(ip.IsUnspecified() || (ip.IsLoopback() && bindHost != "" && net.ParseIP(bindHost) == nil)) {
+			(ip.IsUnspecified() || (ip.IsLoopback() && (bindIPErr != nil || bindHost == "127.0.0.1"))) {
 			addr = net.JoinHostPort(localhostOrDNSName(cert), port)
 		}
 	}
