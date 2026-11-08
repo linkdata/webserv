@@ -30,7 +30,7 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) {
 		if gid, err = strconv.Atoi(groupIDs[i]); err == nil {
 			// On 32-bit cgo, os/user formats high uint32 GIDs as negative ints.
 			if gid == -1 || (strconv.IntSize == 64 && (gid < 0 || uint64(gid) >= math.MaxUint32)) {
-				err = fmt.Errorf("supplementary GID %d is outside the valid range 0..%d", gid, math.MaxUint32-1)
+				err = fmt.Errorf("supplementary GID %d is outside the valid range 0..%d", gid, uint64(math.MaxUint32-1))
 			} else {
 				gids = append(gids, gid)
 			}
@@ -66,9 +66,9 @@ func BecomeUser(userName string) error {
 						case uid == 0:
 							err = fmt.Errorf("resolved UID %d would leave the process running as root", uid)
 						case uid < 0 || uint64(uid) >= math.MaxUint32:
-							err = fmt.Errorf("resolved UID %d is outside the valid range 1..%d", uid, math.MaxUint32-1)
+							err = fmt.Errorf("resolved UID %d is outside the valid range 1..%d", uid, uint64(math.MaxUint32-1))
 						case gid < 0 || uint64(gid) >= math.MaxUint32:
-							err = fmt.Errorf("resolved GID %d is outside the valid range 0..%d", gid, math.MaxUint32-1)
+							err = fmt.Errorf("resolved GID %d is outside the valid range 0..%d", gid, uint64(math.MaxUint32-1))
 						default:
 							var groupIDs []string
 							if groupIDs, err = groupIDsFn(u); err == nil {
