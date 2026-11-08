@@ -63,6 +63,6 @@ func TestDefaultHTTPServerReadTimeout(t *testing.T) {
 
 		_ = writer.Close()
 		ts.CloseClientConnections()
-		<-requestDone
+		_ = <-requestDone
 	})
 }
