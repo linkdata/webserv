@@ -45,7 +45,13 @@ func TestDefaultHTTPServer_HTTP2WriteTimeout(t *testing.T) {
 		default:
 		}
 
-		synctest.Sleep(time.Minute)
+		synctest.Sleep(time.Minute - time.Nanosecond)
+		select {
+		case err := <-writeDone:
+			t.Fatalf("handler Write completed before timeout: %v", err)
+		default:
+		}
+		synctest.Sleep(time.Nanosecond)
 		select {
 		case err := <-writeDone:
 			if err == nil {
