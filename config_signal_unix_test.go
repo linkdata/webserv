@@ -101,10 +101,8 @@ func runSecondSignalChild(t *testing.T) {
 	}
 
 	select {
-	case <-done:
-		close(unblock)
-		<-reqDone
-		os.Exit(0)
+	case err := <-done:
+		t.Fatalf("ServeWith returned before second SIGTERM terminated the process: %v", err)
 	case <-time.After(1500 * time.Millisecond):
 		close(unblock)
 		<-reqDone

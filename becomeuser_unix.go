@@ -13,6 +13,7 @@ var (
 	lookupUserFn = user.Lookup
 	groupIDsFn   = func(u *user.User) ([]string, error) { return u.GroupIds() }
 	geteuidFn    = os.Geteuid
+	getegidFn    = os.Getegid
 	setgroupsFn  = syscall.Setgroups
 	setgidFn     = syscall.Setgid
 	setuidFn     = syscall.Setuid
@@ -36,7 +37,8 @@ func parseGroupIDs(groupIDs []string) (gids []int, err error) {
 // When running as root (euid 0) it resets the supplementary groups to those of
 // the target user and then sets the GID and UID, in that order (setgroups,
 // setgid, setuid). When not root the supplementary-groups reset is skipped and
-// setgid/setuid will fail unless the target ids already match the process.
+// it fails with [syscall.EPERM] unless the target UID and GID already match
+// the effective ids of the process.
 //
 // It then sets the HOME and USER environment variables to match the target user
 // and unsets XDG_CONFIG_HOME so config-directory lookups follow the new HOME.
@@ -50,7 +52,8 @@ func BecomeUser(userName string) error {
 			var uid, gid int
 			if uid, err = strconv.Atoi(u.Uid); err == nil {
 				if gid, err = strconv.Atoi(u.Gid); err == nil {
-					if geteuidFn() == 0 {
+					euid := geteuidFn()
+					if euid == 0 {
 						var groupIDs []string
 						if groupIDs, err = groupIDsFn(u); err == nil {
 							var gids []int
@@ -61,6 +64,12 @@ func BecomeUser(userName string) error {
 								err = setgroupsFn(gids)
 							}
 						}
+					} else if uid != euid || gid != getegidFn() {
+						// Without euid 0, changing IDs can retain supplementary
+						// groups or privileges, or be reversible through real/saved
+						// IDs. Matching effective IDs are allowed, but any existing
+						// saved IDs or privileges remain out of scope.
+						err = syscall.EPERM
 					}
 					if err == nil {
 						if err = setgidFn(gid); err == nil {
