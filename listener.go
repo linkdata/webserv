@@ -68,7 +68,7 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
 		}
 		if l != nil {
 			if listenUrl = overrideUrl; listenUrl == "" {
-				listenUrl = formatListenURL("http"+schemesuffix, listenUrlString(l, cert))
+				listenUrl = formatListenURL("http"+schemesuffix, listenUrlString(l, cert, bindAddr))
 			}
 		}
 	}
@@ -130,10 +130,12 @@ func localhostOrDNSName(cert *tls.Certificate) string {
 	return "localhost"
 }
 
-func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) {
+func listenUrlString(l net.Listener, cert *tls.Certificate, bindAddr string) (addr string) {
 	addr = l.Addr().String()
 	if host, port, err := net.SplitHostPort(addr); err == nil {
-		if ip := net.ParseIP(host); ip != nil && ip.IsUnspecified() {
+		bindHost, _, _ := net.SplitHostPort(bindAddr)
+		if ip := net.ParseIP(host); ip != nil &&
+			(ip.IsUnspecified() || (ip.IsLoopback() && bindHost != "" && net.ParseIP(bindHost) == nil)) {
 			addr = net.JoinHostPort(localhostOrDNSName(cert), port)
 		}
 	}

@@ -66,7 +66,7 @@ func TestRandomPort(t *testing.T) {
 	if len(p) < 2 {
 		t.Error(p)
 	}
-	want := "http://" + gotListener.Addr().String()
+	want := "http://localhost:" + p
 	if gotUrl != want {
 		t.Errorf("want %q got %q", want, gotUrl)
 	}
@@ -75,9 +75,16 @@ func TestRandomPort(t *testing.T) {
 func TestListener_SpecificLoopbackURLUsesBoundIP(t *testing.T) {
 	for _, host := range []string{"127.0.0.1", "127.0.0.2", "::1"} {
 		t.Run(host, func(t *testing.T) {
-			l, gotURL, _, err := webserv.Listener(net.JoinHostPort(host, "0"), "", "", "", "")
+			bindAddr := net.JoinHostPort(host, "0")
+			probe, err := net.Listen("tcp", bindAddr)
 			if err != nil {
 				t.Skipf("cannot bind %s: %v", host, err)
+			}
+			_ = probe.Close()
+
+			l, gotURL, _, err := webserv.Listener(bindAddr, "", "", "", "")
+			if err != nil {
+				t.Fatal(err)
 			}
 			defer func() { _ = l.Close() }()
 
@@ -147,7 +154,15 @@ func TestNew(t *testing.T) {
 					return
 				}
 				if gotListener != nil {
-					if want := tt.args.scheme + "://" + gotListener.Addr().String(); gotUrl != want {
+					wantHostPort := gotListener.Addr().String()
+					if tt.args.address == "localhost:0" {
+						_, port, err := net.SplitHostPort(wantHostPort)
+						if err != nil {
+							t.Fatal(err)
+						}
+						wantHostPort = net.JoinHostPort("localhost", port)
+					}
+					if want := tt.args.scheme + "://" + wantHostPort; gotUrl != want {
 						t.Errorf("Listener() URL = %q, want %q", gotUrl, want)
 					}
 					if gotCertDir != tt.args.certDir {
