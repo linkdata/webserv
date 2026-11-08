@@ -10,6 +10,7 @@ import (
 )
 
 func TestDefaultHTTPServer_HTTP2WriteTimeout(t *testing.T) {
+	t.Setenv("GODEBUG", "http2server=1,http2client=1")
 	synctest.Test(t, func(t *testing.T) {
 		writeDone := make(chan error, 1)
 		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -31,7 +32,7 @@ func TestDefaultHTTPServer_HTTP2WriteTimeout(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.ProtoMajor != 2 {
 			t.Fatalf("protocol = %q, want HTTP/2", resp.Proto)
 		}
@@ -44,8 +45,7 @@ func TestDefaultHTTPServer_HTTP2WriteTimeout(t *testing.T) {
 		default:
 		}
 
-		time.Sleep(time.Minute)
-		synctest.Wait()
+		synctest.Sleep(time.Minute)
 		select {
 		case err := <-writeDone:
 			if err == nil {

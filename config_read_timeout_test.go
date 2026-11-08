@@ -41,14 +41,12 @@ func TestDefaultHTTPServerReadTimeout(t *testing.T) {
 
 		<-started
 		synctest.Sleep(time.Minute - time.Nanosecond)
-		synctest.Wait()
 		select {
 		case err := <-readErr:
 			t.Errorf("request body read ended early: %v", err)
 		default:
 		}
 		synctest.Sleep(time.Nanosecond)
-		synctest.Wait()
 		select {
 		case err := <-readErr:
 			if !errors.Is(err, os.ErrDeadlineExceeded) {
