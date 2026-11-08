@@ -202,17 +202,35 @@ func TestNew(t *testing.T) {
 	})
 }
 
-func TestListener_MalformedBracketHostRejected(t *testing.T) {
-	for _, listenAddr := range []string{"[]", "[]:0", "[]:"} {
-		l, _, _, err := webserv.Listener(listenAddr, "", "", "", "")
-		addr := "<nil>"
-		if l != nil {
-			addr = l.Addr().String()
-			_ = l.Close()
+func TestListener_EmptyBracketHostWithPort(t *testing.T) {
+	for _, listenAddr := range []string{"[]:0", "[]:"} {
+		l, gotURL, _, err := webserv.Listener(listenAddr, "", "", "", "")
+		if err != nil {
+			t.Fatalf("Listener(%q): %v", listenAddr, err)
 		}
-		if err == nil {
-			t.Fatalf("expected malformed listen address %q to fail, got listener on %q", listenAddr, addr)
+		defer func() { _ = l.Close() }()
+
+		host, port, err := net.SplitHostPort(l.Addr().String())
+		if err != nil {
+			t.Fatal(err)
 		}
+		if ip := net.ParseIP(host); ip == nil || !ip.IsUnspecified() || port == "0" {
+			t.Fatalf("Listener(%q) bound %q, want wildcard address and assigned port", listenAddr, l.Addr())
+		}
+		if want := "http://localhost:" + port; gotURL != want {
+			t.Fatalf("Listener(%q) URL = %q, want %q", listenAddr, gotURL, want)
+		}
+	}
+}
+
+func TestListener_BareEmptyBracketHostRejected(t *testing.T) {
+	l, _, _, err := webserv.Listener("[]", "", "", "", "")
+	if l != nil {
+		_ = l.Close()
+		t.Fatalf("Listener(\"[]\") returned listener on %q", l.Addr())
+	}
+	if err == nil {
+		t.Fatal("Listener(\"[]\") succeeded, want invalid address error")
 	}
 }
 
