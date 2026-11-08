@@ -308,7 +308,7 @@ func serveServer(srv *http.Server, l net.Listener) (err error) {
 // If Listen returns an error, cfg.DataDir is reset to empty regardless of the
 // value the caller supplied. cfg.CertDir is left unchanged if Listener fails
 // before resolving an absolute path; otherwise it is set to that path or empty.
-// If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
+// If cfg.ListenURL was empty it may be set to a best-guess printable
 // URL like "http://localhost:80" as soon as the socket is opened.
 // Therefore cfg.ListenURL can be non-empty even if Listen returns an error from a
 // later step, such as user switching or data directory setup.
@@ -649,21 +649,21 @@ type serverTLSListener struct {
 // successfully, absCertDir contains its absolute path even when certificate
 // loading fails.
 func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string) (l net.Listener, listenUrl, absCertDir string, err error) {
-        <span class="cov9" title="25">var cert *tls.Certificate
+        <span class="cov9" title="29">var cert *tls.Certificate
         if cert, absCertDir, err = LoadCert(certDir, fullchainPem, privkeyPem); err == nil </span>{
-                <span class="cov8" title="21">var bindAddr string
+                <span class="cov8" title="25">var bindAddr string
                 var schemesuffix string
                 if cert != nil </span>{
-                        <span class="cov6" title="9">schemesuffix = "s"
+                        <span class="cov6" title="10">schemesuffix = "s"
                         if bindAddr, err = normalizeListenAddr(listenAddr, "443", "8443"); err == nil </span>{
-                                <span class="cov6" title="9">var raw net.Listener
+                                <span class="cov6" title="10">var raw net.Listener
                                 if raw, err = net.Listen("tcp", bindAddr); err == nil </span>{
-                                        <span class="cov6" title="9">tlsConfig := &amp;tls.Config{
+                                        <span class="cov6" title="10">tlsConfig := &amp;tls.Config{
                                                 Certificates: []tls.Certificate{*cert},
                                                 MinVersion:   tls.VersionTLS13,
                                                 NextProtos:   []string{"h2", "http/1.1"},
 </span>                                        }
-                                        <span class="cov6" title="9">l = &amp;serverTLSListener{
+                                        <span class="cov6" title="10">l = &amp;serverTLSListener{
                                                 Listener:  tls.NewListener(raw, tlsConfig),
                                                 raw:       raw,
                                                 tlsConfig: tlsConfig,
@@ -671,32 +671,32 @@ func Listener(listenAddr, certDir, fullchainPem, privkeyPem, overrideUrl string)
                                 }
                         }
                 } else {
-                        <span class="cov7" title="12">if bindAddr, err = normalizeListenAddr(listenAddr, "80", "8080"); err == nil </span>{
-                                <span class="cov6" title="9">l, err = net.Listen("tcp", bindAddr)
+                        <span class="cov7" title="15">if bindAddr, err = normalizeListenAddr(listenAddr, "80", "8080"); err == nil </span>{
+                                <span class="cov7" title="12">l, err = net.Listen("tcp", bindAddr)
 </span>                        }
                 }
-                <span class="cov8" title="21">if l != nil </span>{
-                        <span class="cov7" title="16">if listenUrl = overrideUrl; listenUrl == "" </span>{
-                                <span class="cov7" title="16">listenUrl = formatListenURL("http"+schemesuffix, listenUrlString(l, cert))
+                <span class="cov8" title="25">if l != nil </span>{
+                        <span class="cov8" title="20">if listenUrl = overrideUrl; listenUrl == "" </span>{
+                                <span class="cov8" title="20">listenUrl = formatListenURL("http"+schemesuffix, listenUrlString(l, cert, bindAddr))
 </span>                        }
                 }
         }
-        <span class="cov9" title="25">return</span>
+        <span class="cov9" title="29">return</span>
 }
 
 func formatListenURL(scheme, hostPort string) string {
-        <span class="cov8" title="17">return (&amp;url.URL{Scheme: scheme, Host: hostPort}).String()
+        <span class="cov8" title="21">return (&amp;url.URL{Scheme: scheme, Host: hostPort}).String()
 </span>}
 
 func normalizeListenAddr(address, defaultpriv, defaultother string) (string, error) {
         // A complete "host:port" (including "[host]:port" and ":port") is kept as-is.
         // The empty bracketed host "[]" is the one exception: unlike a port-only
         // ":port" it is never a valid host.
-        <span class="cov10" title="37">if _, _, err := net.SplitHostPort(address); err == nil </span>{
-                <span class="cov8" title="22">if strings.HasPrefix(address, "[]") </span>{
+        <span class="cov10" title="41">if _, _, err := net.SplitHostPort(address); err == nil </span>{
+                <span class="cov8" title="26">if strings.HasPrefix(address, "[]") </span>{
                         <span class="cov4" title="4">return "", net.InvalidAddrError(address)
 </span>                }
-                <span class="cov8" title="18">return address, nil</span>
+                <span class="cov8" title="22">return address, nil</span>
         }
 
         // No port: address is a bare host. A leading "[" must wrap a valid IP
@@ -713,7 +713,7 @@ func normalizeListenAddr(address, defaultpriv, defaultother string) (string, err
 </span>                }
                 <span class="cov2" title="2">host = lit</span>
         }
-        <span class="cov5" title="5">return net.JoinHostPort(host, defaultListenPort(os.Geteuid(), defaultpriv, defaultother)), nil</span>
+        <span class="cov4" title="5">return net.JoinHostPort(host, defaultListenPort(os.Geteuid(), defaultpriv, defaultother)), nil</span>
 }
 
 func defaultListenPort(euid int, defaultpriv, defaultother string) (port string) {
@@ -725,30 +725,32 @@ func defaultListenPort(euid int, defaultpriv, defaultother string) (port string)
 }
 
 func localhostOrDNSName(cert *tls.Certificate) string {
-        <span class="cov9" title="27">if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span>{
-                <span class="cov7" title="16">name := cert.Leaf.DNSNames[0]
+        <span class="cov9" title="28">if cert != nil &amp;&amp; cert.Leaf != nil &amp;&amp; len(cert.Leaf.DNSNames) &gt; 0 </span>{
+                <span class="cov7" title="17">name := cert.Leaf.DNSNames[0]
                 if host, _, err := net.SplitHostPort(name); err == nil </span>{
-                        <span class="cov6" title="10">name = host
+                        <span class="cov6" title="11">name = host
 </span>                }
                 // Guard against a certificate whose first DNS name is empty, strips to
                 // empty, or is a wildcard: those would build an unconnectable URL host.
-                <span class="cov7" title="16">if name != "" &amp;&amp; !strings.Contains(name, "*") </span>{
-                        <span class="cov7" title="12">return name
+                <span class="cov7" title="17">if name != "" &amp;&amp; !strings.Contains(name, "*") </span>{
+                        <span class="cov7" title="13">return name
 </span>                }
         }
         <span class="cov7" title="15">return "localhost"</span>
 }
 
-func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) {
-        <span class="cov8" title="19">addr = l.Addr().String()
+func listenUrlString(l net.Listener, cert *tls.Certificate, bindAddr string) (addr string) {
+        <span class="cov8" title="23">addr = l.Addr().String()
         if host, port, err := net.SplitHostPort(addr); err == nil </span>{
-                <span class="cov8" title="19">if ip := net.ParseIP(host); ip != nil </span>{
-                        <span class="cov8" title="19">if ip.IsUnspecified() || ip.IsLoopback() </span>{
-                                <span class="cov8" title="19">addr = net.JoinHostPort(localhostOrDNSName(cert), port)
-</span>                        }
-                }
+                <span class="cov8" title="23">bindHost, _, _ := net.SplitHostPort(bindAddr)
+                _, bindIPErr := netip.ParseAddr(bindHost)
+</span>                // Keep the existing URL choice for hostnames and 127.0.0.1.
+                <span class="cov8" title="23">if ip := net.ParseIP(host); ip != nil &amp;&amp;
+                        (ip.IsUnspecified() || (ip.IsLoopback() &amp;&amp; (bindIPErr != nil || host == "127.0.0.1"))) </span>{
+                        <span class="cov8" title="20">addr = net.JoinHostPort(localhostOrDNSName(cert), port)
+</span>                }
         }
-        <span class="cov8" title="19">return</span>
+        <span class="cov8" title="23">return</span>
 }
 </pre>
 		
@@ -780,28 +782,28 @@ import (
 // resolved absolute directory whenever certDir was non-empty after expansion and
 // [path/filepath.Abs] succeeded, regardless of whether the key pair then loaded.
 func LoadCert(certDir, fullchainPem, privkeyPem string) (cert *tls.Certificate, absCertDir string, err error) {
-        <span class="cov10" title="29">if certDir != "" </span>{
+        <span class="cov10" title="33">if certDir != "" </span>{
                 // Re-check after expansion: a non-empty input may expand to empty
                 // (e.g. "$HOME" with HOME unset), and filepath.Abs("") would resolve
                 // to the current working directory rather than leaving certDir empty.
-                <span class="cov8" title="16">if certDir = os.ExpandEnv(certDir); certDir != "" </span>{
-                        <span class="cov8" title="15">if absCertDir, err = filepath.Abs(certDir); err == nil </span>{
-                                <span class="cov7" title="13">var cer tls.Certificate
+                <span class="cov8" title="17">if certDir = os.ExpandEnv(certDir); certDir != "" </span>{
+                        <span class="cov8" title="16">if absCertDir, err = filepath.Abs(certDir); err == nil </span>{
+                                <span class="cov7" title="14">var cer tls.Certificate
                                 if fullchainPem == "" </span>{
-                                        <span class="cov7" title="12">fullchainPem = FullchainPem
+                                        <span class="cov7" title="13">fullchainPem = FullchainPem
 </span>                                }
-                                <span class="cov7" title="13">if privkeyPem == "" </span>{
-                                        <span class="cov7" title="12">privkeyPem = PrivkeyPem
+                                <span class="cov7" title="14">if privkeyPem == "" </span>{
+                                        <span class="cov7" title="13">privkeyPem = PrivkeyPem
 </span>                                }
-                                <span class="cov7" title="13">fc := filepath.Join(absCertDir, fullchainPem)
+                                <span class="cov7" title="14">fc := filepath.Join(absCertDir, fullchainPem)
                                 pk := filepath.Join(absCertDir, privkeyPem)
                                 if cer, err = tls.LoadX509KeyPair(fc, pk); err == nil </span>{
-                                        <span class="cov7" title="11">cert = &amp;cer
+                                        <span class="cov7" title="12">cert = &amp;cer
 </span>                                }
                         }
                 }
         }
-        <span class="cov10" title="29">return</span>
+        <span class="cov10" title="33">return</span>
 }
 </pre>
 		
