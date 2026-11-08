@@ -380,7 +380,7 @@ func TestConfigListen_RetryKeepsUnresolvedCertDir(t *testing.T) {
 		l, err := cfg.Listen()
 		if l != nil {
 			_ = l.Close()
-			t.Fatalf("Listen attempt %d returned a listener on error", attempt)
+			t.Fatalf("Listen attempt %d unexpectedly returned a listener", attempt)
 		}
 		if err == nil {
 			t.Fatalf("Listen attempt %d succeeded with an unresolved CertDir", attempt)
