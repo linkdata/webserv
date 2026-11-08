@@ -133,10 +133,8 @@ func localhostOrDNSName(cert *tls.Certificate) string {
 func listenUrlString(l net.Listener, cert *tls.Certificate) (addr string) {
 	addr = l.Addr().String()
 	if host, port, err := net.SplitHostPort(addr); err == nil {
-		if ip := net.ParseIP(host); ip != nil {
-			if ip.IsUnspecified() || ip.IsLoopback() {
-				addr = net.JoinHostPort(localhostOrDNSName(cert), port)
-			}
+		if ip := net.ParseIP(host); ip != nil && ip.IsUnspecified() {
+			addr = net.JoinHostPort(localhostOrDNSName(cert), port)
 		}
 	}
 	return
