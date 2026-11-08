@@ -30,20 +30,22 @@ func TestDefaultHTTPServerReadTimeout(t *testing.T) {
 			t.Fatal(err)
 		}
 		req.ContentLength = 1
-		requestDone := make(chan error, 1)
+		requestDone := make(chan struct{})
+		var requestErr error
 		go func() {
+			defer close(requestDone)
 			resp, err := client.Do(req)
+			requestErr = err
 			if resp != nil {
 				_ = resp.Body.Close()
 			}
-			requestDone <- err
 		}()
 
 		select {
 		case <-started:
-		case err := <-requestDone:
+		case <-requestDone:
 			_ = writer.Close()
-			t.Fatalf("client request ended before handler started: %v", err)
+			t.Fatalf("client request ended before handler started: %v", requestErr)
 		}
 		synctest.Sleep(time.Minute - time.Nanosecond)
 		select {
@@ -63,6 +65,6 @@ func TestDefaultHTTPServerReadTimeout(t *testing.T) {
 
 		_ = writer.Close()
 		ts.CloseClientConnections()
-		_ = <-requestDone
+		<-requestDone
 	})
 }
