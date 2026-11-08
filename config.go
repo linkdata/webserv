@@ -98,8 +98,8 @@ func serveServer(srv *http.Server, l net.Listener) (err error) {
 //
 // On success, cfg.CertDir and cfg.DataDir will be absolute paths or be empty.
 // If Listen returns an error, cfg.DataDir is reset to empty regardless of the
-// value the caller supplied. cfg.CertDir keeps any absolute path resolved
-// before the failure, or its original value if resolution failed.
+// value the caller supplied. cfg.CertDir is left unchanged if Listener fails
+// before resolving an absolute path; otherwise it is set to that path or empty.
 // If cfg.ListenURL was empty it may be set to a best-guess printable and connectable
 // URL like "http://localhost:80" as soon as the socket is opened.
 // Therefore cfg.ListenURL can be non-empty even if Listen returns an error from a
